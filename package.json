@@ -1,0 +1,120 @@
+{
+  "name": "SIERRA",
+  "version": "0.1.0",
+  "private": true,
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "scripts": {
+    "build:dev": "webpack --env.env=development",
+    "build:dev:watch": "yarn build:dev --watch --hot",
+    "build:dev:analyze": "yarn build:dev --env.addon=bundleanalyze --env.addon=bundlevisualizer",
+    "build": "webpack -p --env.env=production",
+    "build:watch": "yarn build --watch",
+    "build:analyze": "yarn build --env.addon=bundleanalyze --env.addon=bundlevisualizer",
+    "lint": "prettier --ignore-path .eslintignore --check \"**/*.{js,jsx,json,css,sass,scss,less,html,md}\"",
+    "lint:fix": "prettier --ignore-path .eslintignore --write \"**/*.{js,jsx,json,css,sass,scss,less,html,md}\"",
+    "serve:dev": "webpack-dev-server --host 0.0.0.0 --mode development --open --hot --env.env=development",
+    "serve:dev:dashboard": "webpack-dashboard webpack-dev-server -- --mode development --env.addon=dashboard",
+    "start": "yarn serve:dev",
+    "serve": "yarn build && serve -s -C build",
+    "test": "jest --runInBand --detectOpenHandles --passWithNoTests",
+    "test:watch": "jest -u --runInBand --verbose --watch --detectOpenHandles --passWithNoTests",
+    "test:coverage": "jest -u --coverage --verbose --runInBand --detectOpenHandles --passWithNoTests"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.{js,jsx}": [
+      "prettier --write",
+      "yarn lint:fix"
+    ],
+    "*.{json,css,sass,scss,less,html,md}": [
+      "prettier --write"
+    ]
+  },
+  "dependencies": {
+    "@codemirror/legacy-modes": "^0.19.0",
+    "@codemirror/stream-parser": "^0.19.5",
+    "@uiw/react-codemirror": "4.6.0",
+    "antd": "^4.18.5",
+    "bootstrap": "^4.6.0",
+    "crypto-browserify": "^3.12.0",
+    "docker": "^1.0.0",
+    "jquery": "^1.9.1",
+    "lodash": "^4.15.0",
+    "neo4j-driver": "^4.2.2",
+    "react": "^17.0.1",
+    "react-dom": "^17.0.1",
+    "react-flow-renderer": "9.0.4",
+    "react-icons": "^4.2.0",
+    "react-select": "4.2.1",
+    "yarn": "1.22.10"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.13.0",
+    "@babel/core": "^7.13.8",
+    "@babel/plugin-proposal-class-properties": "^7.13.0",
+    "@babel/plugin-proposal-object-rest-spread": "^7.13.8",
+    "@babel/preset-env": "^7.13.8",
+    "@babel/preset-react": "^7.12.13",
+    "babel-eslint": "^10.1.0",
+    "babel-jest": "^26.6.3",
+    "babel-loader": "^8.2.2",
+    "babel-plugin-module-resolver": "^4.1.0",
+    "babel-plugin-transform-class-properties": "^6.24.1",
+    "babel-polyfill": "^6.26.0",
+    "babel-preset-env": "^1.7.0",
+    "clean-webpack-plugin": "^3.0.0",
+    "copy-webpack-plugin": "^7.0.0",
+    "css-loader": "^5.1.0",
+    "dotenv-webpack": "^6.0.2",
+    "eslint": "^7.20.0",
+    "eslint-config-prettier": "^8.1.0",
+    "eslint-import-resolver-webpack": "^0.13.0",
+    "eslint-loader": "^4.0.2",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-jsx-a11y": "^6.4.1",
+    "eslint-plugin-prettier": "^3.3.1",
+    "eslint-plugin-react": "^7.22.0",
+    "file-loader": "^6.2.0",
+    "html-webpack-plugin": "^5.3.1",
+    "husky": "^5.1.1",
+    "inject-html-webpack-plugin": "^1.0.0",
+    "less": "^4.1.1",
+    "less-loader": "^8.0.0",
+    "lint-staged": "^10.5.4",
+    "mini-css-extract-plugin": "^1.3.9",
+    "node-sass": "^5.0.0",
+    "path": "^0.12.7",
+    "prettier": "^2.2.1",
+    "react-hot-loader": "^4.13.0",
+    "sass-loader": "^11.0.1",
+    "serve": "^11.3.2",
+    "sinon": "^9.2.4",
+    "style-loader": "^2.0.0",
+    "terser-webpack-plugin": "^5.1.1",
+    "url-loader": "1.1.2",
+    "webpack": "^5.34.0",
+    "webpack-async-chunk-names-plugin": "^0.1.1",
+    "webpack-bundle-analyzer": "^4.4.0",
+    "webpack-cli": "^3.3.12",
+    "webpack-dashboard": "^3.3.1",
+    "webpack-dev-server": "^3.11.2",
+    "webpack-hot-middleware": "^2.25.0",
+    "webpack-manifest-plugin": "^3.0.0",
+    "webpack-merge": "^5.7.3"
+  }
+}

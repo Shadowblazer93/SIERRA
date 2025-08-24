@@ -1,0 +1,5 @@
+.customDrop .ant-select-selector {
+  background: transparent !important;
+  /* border-color: #d9d9d9 !important; */
+  border-radius: 4px !important;
+}

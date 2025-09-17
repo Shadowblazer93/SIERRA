@@ -137,10 +137,36 @@ const convertToQuery = (state) => {
     allPredsArr = allPredsArr.concat(nodePredsArr);
   }
   var allRsQueries = [];
+  var cardinalityWithQueries = [];
+  var cardinalityWhereQueries = [];
+  var blockedReturnNodes = [];
+
   for (var i = 0; i < state.edges.length; i++) {
     var srcNode = state.nodes.find((el) => el.id === state.edges[i].source);
     var destNode = state.nodes.find((el) => el.id === state.edges[i].target);
     var qString;
+
+    // cardinality
+    if (state.edges[i].data.cardinality!=undefined) {
+      console.log("HOOYAH",srcNode)
+      const cardinality = state.edges[i].data.cardinality;
+      var min = cardinality.min;
+      var max = cardinality.max;
+
+      if (!(min==1 && max==1)) {
+        if (min!=1) {
+          cardinalityWithQueries.push(`${destNode.data.rep}`)
+          cardinalityWithQueries.push(`count(${srcNode.data.rep}) AS relCount`)
+          cardinalityWhereQueries.push(`relCount = ${min}`)
+          blockedReturnNodes.push(srcNode.data.rep);
+        } else {
+          cardinalityWithQueries.push(`${srcNode.data.rep}`)
+          cardinalityWithQueries.push(`count(${destNode.data.rep}) AS relCount`)
+          cardinalityWhereQueries.push(`relCount = ${max}`)
+          blockedReturnNodes.push(destNode.data.rep);
+        }
+      }
+    }
     // if directed
     if (state.edges[i].arrowHeadType !== '') {
       var rsLabel = 'r' + (i + 10).toString(36);
@@ -186,6 +212,19 @@ const convertToQuery = (state) => {
   }
 
   var allRsQueriesString = allRsQueries.join(', ');
+  var allCardinalityWithString = cardinalityWithQueries.join(', ')
+  var allCardinalityWhereString = cardinalityWhereQueries.join(', ')
+
+  if (allCardinalityWhereString.length!=0 || allCardinalityWithString.length!=0) {
+    if (blockedReturnNodes.length>0) {
+      returnVars = returnVars.filter(v => !blockedReturnNodes.includes(v));
+    }
+
+    return `MATCH ${loneQueryString}${allRsQueriesString}
+WITH ${allCardinalityWithString}
+WHERE ${allCardinalityWhereString}
+RETURN ${returnVars.join(', ')}`
+  }
 
   return allPredsQueryString ?
     `MATCH ${loneQueryString}${allRsQueriesString}

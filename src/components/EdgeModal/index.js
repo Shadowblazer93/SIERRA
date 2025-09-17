@@ -1,6 +1,7 @@
 import React, {useState, useContext} from 'react';
 import {Button, Drawer, Typography, Select, Divider, Tag, Tooltip} from 'antd';
 import {ArrowLeftOutlined} from '@ant-design/icons'
+import { InputNumber } from 'antd';
 import { PRED_COLOR_V2 } from '../../constants';
 import {Context} from '../../Store';
 import { PredicateCheckBox, PredicateDraw, SelectTag } from '../common';
@@ -16,6 +17,7 @@ const EdgeModal = ({
   rs,
   allRs,
   updateEdgeRs,
+  updateEdgeCardinality,
   predicates,
   addPredicate,
   updatePredicate,
@@ -26,8 +28,9 @@ const EdgeModal = ({
   //..
   const [state, dispatch] = useContext(Context);
   const [childrenDrawer, setChildDrawer] = useState({});
+  const [cardinality, setCardinality] = useState({ min: 1, max: 1 });
   const rsOptions = Object.keys(allRs ?? {})
-  const rsAttributes = rs ? allRs[rs] : []
+  const rsAttributes = rs && allRs[rs] ? allRs[rs] : []
 
   const showChildrenDrawer = (attr) => {
     setChildDrawer({
@@ -146,6 +149,44 @@ const EdgeModal = ({
           )
 
         }
+
+        {/* Cardinality */}
+          <Divider orientation="left">Cardinality</Divider>
+          <div style={{padding: '0px 15px 10px'}}>
+            <InputNumber
+              min={1}
+              value={cardinality.min}
+              disabled={cardinality.max !== 1} // lock if max is set
+              onChange={(val) => {
+                const newCard = { min: val, max: 1 };
+                setCardinality(newCard);
+                updateEdgeCardinality(newCard);
+              }}
+              style={{width: 60, marginRight: 8}}
+            />
+            to
+            <InputNumber
+              min={1}
+              value={cardinality.max}
+              disabled={cardinality.min !== 1} // lock if min is set
+              onChange={(val) => {
+                const newCard = { min: 1, max: val };
+                setCardinality(newCard);
+                updateEdgeCardinality(newCard);
+              }}
+              style={{width: 60, marginLeft: 8}}
+            />
+            <Button
+              style={{marginLeft: 16}}
+              onClick={() => {
+                const resetCard = { min: 1, max: 1 };
+                setCardinality(resetCard);
+                updateEdgeCardinality(resetCard);
+              }}
+            >
+              Reset
+            </Button>
+          </div>
         </>
     </Drawer>
   )

@@ -8,6 +8,7 @@ import * as Constants from '../constants';
 import Predicate from './Predicate';
 import EdgeModal from './EdgeModal';
 import useVisualActions from '../hooks/useVisualActions';
+import { Tooltip } from 'antd';
 
 const api = require('../neo4jApi');
 
@@ -27,6 +28,7 @@ function CustomEdge({
   arrowHeadType,
   markerEndId,
 }) {
+  console.log("CustomEdge data:", data);
 
   const VA = useVisualActions()
   const [directed, setDirected] = useState(true);
@@ -37,7 +39,7 @@ function CustomEdge({
   const markerEnd = getMarkerEnd(directed === true ? arrowHeadType : '', markerEndId);
 
   const predicates = data.predicates ?? {}
-  const {rs} = data
+  const {rs, cardinality} = data
   const isDirected = arrowHeadType === "arrowclosed"
 
   useEffect(() => {
@@ -88,6 +90,15 @@ function CustomEdge({
     _internalDispatchGraph(graph)
 
   }
+
+  const updateEdgeCardinality = async (newCardinality) => {
+  const graph = VA.update(state, "EDGE", {
+    edge: id,
+    prop: 'data',
+    newVal: { ...data, cardinality: newCardinality, predicates: {} }
+  });
+  _internalDispatchGraph(graph);
+};
 
   const addPredicate = (attr, color) => {
     const graph = VA.add(state, "PREDICATE", {
@@ -196,6 +207,9 @@ function CustomEdge({
     }
   }
 
+  const midX = (sourceX + targetX) / 2;
+  const midY = (sourceY + targetY) / 2 + 10;
+
   return (
     <>
       <path
@@ -213,13 +227,52 @@ function CustomEdge({
 
       </path>
       {preds()}
-      )}
+      )
 
       <text dy="-10px">
         <textPath href={`#${id}`} style={{ fontSize: '1rem' }} startOffset="50%" textAnchor="middle">
           {rs}
         </textPath>
       </text>
+      {cardinality && !(cardinality.min === 1 && cardinality.max === 1) && (
+        <Tooltip
+          title={
+            <>
+              <div style={{fontWeight: 'bold'}}>Cardinality: {cardinality.min} to {cardinality.max}</div>
+              <div style={{marginTop: 4, fontSize: 12, color: '#ffffffff'}}>
+                For every {cardinality.min} relationship(s) of <b>{data.source}</b>, there are {cardinality.max} relationships of <b>{data.destination}</b>.
+              </div>
+            </>
+    }
+          placement="bottom"
+          overlayStyle={{ zIndex: 9999, maxWidth:220 }}
+        >
+          <g>
+            <rect
+              x={midX - 18}
+              y={midY - 14}
+              width={36}
+              height={20}
+              rx={6}
+              fill="#fff"
+              stroke="#888"
+              strokeWidth={1}
+              opacity={0.85}
+            />
+            <text
+              x={midX}
+              y={midY}
+              textAnchor="middle"
+              alignmentBaseline="middle"
+              fontSize="12"
+              fontWeight="bold"
+              fill="#333"
+            >
+              {cardinality.min} → {cardinality.max}
+            </text>
+          </g>
+        </Tooltip>
+      )}
       <EdgeModal
         source={data.source}
         destination={data.destination}
@@ -228,8 +281,10 @@ function CustomEdge({
         onClose={() => {setModalVisible(false)}}
         allRs={availRs}
         rs={rs}
+        cardinality={cardinality}
         visible={id === state.modalVisible}
         updateEdgeRs={updateEdgeRs}
+        updateEdgeCardinality={updateEdgeCardinality}
         predicates={predicates}
         addPredicate={addPredicate}
         updatePredicate={updatePredicate}

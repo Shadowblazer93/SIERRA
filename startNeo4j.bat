@@ -1,1 +1,0 @@
-CMD /c ""C:\Program Files\Neo4j Desktop\Neo4j Desktop.exe""

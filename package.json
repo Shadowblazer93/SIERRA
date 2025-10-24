@@ -17,7 +17,7 @@
   },
   "scripts": {
     "predeploy": "npm run start",
-    "deploy": "gh-pages -b task1 -d build",
+    "deploy": "gh-pages -b main -d build",
     "build:dev": "webpack --env.env=development",
     "build:dev:watch": "yarn build:dev --watch --hot",
     "build:dev:analyze": "yarn build:dev --env.addon=bundleanalyze --env.addon=bundlevisualizer",

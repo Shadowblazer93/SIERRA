@@ -1,0 +1,9 @@
+.predicate-tag {
+  cursor: pointer;
+  transition: 0.1s;
+  margin-bottom: 8px;
+}
+
+.predicate-tag:hover {
+  transform: scale(1.05);
+}

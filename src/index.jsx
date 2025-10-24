@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import Store from './Store';
-import { BrowserRouter } from 'react-router-dom/BrowserRouter';
+import { BrowserRouter } from 'react-router-dom';
 import './App.css';
 import '../node_modules/bootstrap/dist/css/bootstrap.min.css';
 import 'antd/dist/antd.css';
@@ -10,7 +10,7 @@ import * as serviceWorker from 'app/service-worker';
 import App from './App';
 
 ReactDOM.render(
-  <BrowserRouter basename={process.env.PUBLIC_URL || '/SIERRA'}>
+  <BrowserRouter basename={process.env.PUBLIC_URL}>
     <App />
   </BrowserRouter>,
   document.getElementById('app'),

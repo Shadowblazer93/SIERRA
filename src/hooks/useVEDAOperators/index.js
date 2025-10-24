@@ -149,6 +149,7 @@ const useVEDAOperators = () => {
           attributes: graph.props[nodeName],
           possibleTargets: possibleNeighbours,
           connected: false,
+          isJoin: false,
           predicates: {},
           VEDAPosition: [],
           ...addData

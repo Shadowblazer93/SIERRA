@@ -110,5 +110,6 @@ td {
   z-index: 20;
 }
 
-
-
+.ant-tooltip-inner {
+  border-radius: 8px !important;
+}

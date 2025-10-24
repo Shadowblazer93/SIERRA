@@ -8,7 +8,9 @@ const initialState = {
   neighbours: {},
   props: {},
   predDisplayStatus: 'FULL',
-  modalVisible: ''
+  modalVisible: '',
+  linkingPredicate: null,
+  predicateLinks: []
 };
 
 const Store = ({ children }) => {

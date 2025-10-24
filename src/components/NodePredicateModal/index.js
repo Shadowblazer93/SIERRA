@@ -22,6 +22,8 @@ const NodePredicateModal = ({
   deletePredicate,
   updatePredicate,
   currPos,
+  isJoin,
+  setIsJoin,
   propData,
 }) => {
   const VA = useVisualActions()
@@ -90,7 +92,7 @@ const NodePredicateModal = ({
             const colour = PRED_COLOR_V2[attributes.indexOf(attr) % PRED_COLOR_V2.length]
             return (
               <div key={`pt-${i}`}>
-                <SelectTag onClick={() => {showChildrenDrawer(attr)}} colour={colour.name} key={`${attr}-k`} text={attr} />
+                <SelectTag onClick={() => {showChildrenDrawer(attr); console.log("YES CLICKED")}} colour={colour.name} key={`${attr}-k`} text={attr} />
                 <PredicateDraw
                   onClose={() => onChildrenDrawerClose(attr)}
                   attr={attr}
@@ -132,6 +134,20 @@ const NodePredicateModal = ({
           }
 
         </div>
+
+        <Divider orientation="left">Join : Optional Match</Divider>
+        <div style={{padding: '0px 15px 10px'}}>
+          <Button
+            type={isJoin ? "primary" : "default"}
+            onClick={() => {
+              setIsJoin(!isJoin);
+            }}
+            style={{ width: '100%' }}
+          >
+            {isJoin ? "Joined" : "Join"}
+          </Button>
+        </div>
+
         <Divider orientation="left">Possible Targets</Divider>
         {
           targets.map((target, i) => {

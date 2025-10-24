@@ -18,7 +18,7 @@
   transform: scale(1.2);
 }
 
-.ant-checkbox-checked .ant-checkbox-inner {
+/* .ant-checkbox-checked .ant-checkbox-inner {
   background-color: var(--background-color);
   border-color: var(--border-color);
-}
+} */

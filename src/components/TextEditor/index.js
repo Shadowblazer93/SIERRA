@@ -19,6 +19,7 @@ export default function({text}){
   const [cnlNodes, cnlEdges] = useStoreState((store) => [store.nodes, store.edges])
   const VA = useVisualActions()
   const [innerText, setInnerText] = useState(text)
+  const [showQuery, setShowQuery] = useState(false);
   const onCopy = () => {
     if(innerText){
       navigator.clipboard.writeText(innerText).then(() => {
@@ -164,38 +165,56 @@ export default function({text}){
   }
 
   return(
-    <div style={{background: '#fff'}} className="text-container">
-      <div style ={{display: 'flex', flexDirection: 'row', justifyContent:'space-between'}}>
-        <Title level={5}>Cypher Query</Title>
-        <CopyOutlined
-          onClick={onCopy}
-          style={{
-            fontSize: '16px',
-            margin: '7px 8px 0px auto'
-          }}
-          />
-        <Button
-          style={{
-            fontSize: 13,
-            height:30,
-            borderRadius: 4,
-          }}
-          type="primary"
-          // disabled={state.nodes.length === 0}
-          onClick={handleSearch}
-        >
-          Translate
-        </Button>
-      </div>
-      <CodeMirror
-        value={text}
-        height="200px"
-        extensions={[StreamLanguage.define(cypher)]}
-        onChange={(value) => {
-          setInnerText(value);
+    <>
+      <Button
+        style={{
+          position: 'fixed',
+          top: 24,
+          right: 160,
+          zIndex: 1000,
+          fontSize: 13,
+          height: 32,
+          borderRadius: 4,
+          marginBottom: 0
         }}
-      />
-
-    </div>
+        type="primary"
+        onClick={() => setShowQuery(v => !v)}
+      >
+        {showQuery ? "Hide Cypher Query" : "Show Cypher Query"}
+      </Button>
+      {showQuery && (
+        <div style={{background: '#fff'}} className="text-container">
+          <div style ={{display: 'flex', flexDirection: 'row', justifyContent:'space-between'}}>
+            <Title level={5}>Cypher Query</Title>
+            <CopyOutlined
+              onClick={onCopy}
+              style={{
+                fontSize: '16px',
+                margin: '7px 8px 0px auto'
+              }}
+            />
+            <Button
+              style={{
+                fontSize: 13,
+                height:30,
+                borderRadius: 4,
+              }}
+              type="primary"
+              onClick={handleSearch}
+            >
+              Translate
+            </Button>
+          </div>
+          <CodeMirror
+            value={text}
+            height="200px"
+            extensions={[StreamLanguage.define(cypher)]}
+            onChange={(value) => {
+              setInnerText(value);
+            }}
+          />
+        </div>
+      )}
+    </>
   )
 }

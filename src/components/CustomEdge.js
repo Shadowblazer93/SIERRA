@@ -7,7 +7,10 @@ import { BsPencilSquare, BsPlusCircle, BsFillEyeFill } from 'react-icons/bs';
 import * as Constants from '../constants';
 import Predicate from './Predicate';
 import EdgeModal from './EdgeModal';
+import CardinalityPropsModal from './CardinalityPropsModal';
 import useVisualActions from '../hooks/useVisualActions';
+import { Tooltip } from 'antd';
+import joinIcon from '../assets/images/join_icon.png';
 
 const api = require('../neo4jApi');
 
@@ -27,17 +30,19 @@ function CustomEdge({
   arrowHeadType,
   markerEndId,
 }) {
+  console.log("CustomEdge data:", data);
 
   const VA = useVisualActions()
   const [directed, setDirected] = useState(true);
   const [state, dispatch] = useContext(Context);
   const [propData, setPropData] = useState([]);
+  const [cardinalityModalVisible, setCardinalityModalVisible] = useState(false);
 
   const edgePath = `M ${sourceX}, ${sourceY}L ${targetX}, ${targetY}`
   const markerEnd = getMarkerEnd(directed === true ? arrowHeadType : '', markerEndId);
 
   const predicates = data.predicates ?? {}
-  const {rs} = data
+  const {rs, cardinality, isOptional, cardinalityProps} = data
   const isDirected = arrowHeadType === "arrowclosed"
 
   useEffect(() => {
@@ -87,6 +92,33 @@ function CustomEdge({
     })
     _internalDispatchGraph(graph)
 
+  }
+
+  const updateEdgeCardinality = async (newCardinality) => {
+    const graph = VA.update(state, "EDGE", {
+      edge: id,
+      prop: 'data',
+      newVal: { ...data, cardinality: newCardinality, predicates: {} }
+    });
+    _internalDispatchGraph(graph);
+  };
+
+  const updateEdgeCardinalityProps = (newProps) => {
+    const graph = VA.update(state, "EDGE", {
+      edge: id,
+      prop: 'data',
+      newVal: { ...data, cardinalityProps: newProps }
+    });
+    _internalDispatchGraph(graph);
+  };
+
+  const updateEdgeIsOptional = async (newIsOptional) => {
+    const graph = VA.update(state, "EDGE", {
+      edge: id,
+      prop: 'data',
+      newVal: {...data, isOptional: newIsOptional, predicates: {}}
+    });
+    _internalDispatchGraph(graph);
   }
 
   const addPredicate = (attr, color) => {
@@ -196,6 +228,14 @@ function CustomEdge({
     }
   }
 
+  const midX = (sourceX + targetX) / 2;
+  const midY = (sourceY + targetY) / 2 + 10;
+
+  const baseWidth = 36;
+  const bubbleSpacing = 22;
+  const numBubbles = Array.isArray(cardinalityProps) ? cardinalityProps.length : 0;
+  const boxWidth = baseWidth + Math.max(0, numBubbles - 1) * bubbleSpacing;
+
   return (
     <>
       <path
@@ -213,13 +253,120 @@ function CustomEdge({
 
       </path>
       {preds()}
-      )}
+      )
 
       <text dy="-10px">
         <textPath href={`#${id}`} style={{ fontSize: '1rem' }} startOffset="50%" textAnchor="middle">
           {rs}
         </textPath>
       </text>
+      {cardinality && !(cardinality.min === 1 && cardinality.max === 1) && (
+        <>
+          {/* Cardinality box with its own tooltip and click */}
+          <Tooltip
+            title={
+              <>
+                <div style={{fontWeight: 'bold'}}>Cardinality: {cardinality.min} to {cardinality.max}</div>
+                <div style={{marginTop: 4, fontSize: 12, color: '#ffffffff'}}>
+                  For every {cardinality.min} relationship(s) of <b>{data.source}</b>, there are {cardinality.max} relationships of <b>{data.destination}</b>.
+                </div>
+              </>
+            }
+            placement="bottom"
+            overlayStyle={{ zIndex: 9999, maxWidth:220 }}
+            mouseEnterDelay={0}
+            mouseLeaveDelay={0}
+            destroyTooltipOnHide
+            getPopupContainer={() => document.body}
+          >
+            <g
+              style={{ cursor: 'pointer' }}
+              onClick={e => {
+                e.stopPropagation();
+                setCardinalityModalVisible(true);
+              }}
+            >
+              <rect
+                x={midX - boxWidth / 2}
+                y={midY - 14}
+                width={boxWidth}
+                height={20}
+                rx={6}
+                fill="#fff"
+                stroke="#888"
+                strokeWidth={1}
+                opacity={0.85}
+              />
+              <text
+                x={midX}
+                y={midY}
+                textAnchor="middle"
+                alignmentBaseline="middle"
+                fontSize="12"
+                fontWeight="bold"
+                fill="#333"
+              >
+                {cardinality.min} → {cardinality.max}
+              </text>
+            </g>
+          </Tooltip>
+          {/* Render property bubbles as separate elements, overlaid above the box */}
+          {Array.isArray(cardinalityProps) && cardinalityProps.map((prop, idx) => (
+            <Tooltip
+              key={prop.key || idx}
+              title={<span><b>{prop.key}</b>{prop.value ? `: ${prop.value}` : ''}</span>}
+              placement="bottom"
+              overlayStyle={{ zIndex: 9999 }}
+            >
+              <circle
+                cx={midX - (boxWidth / 2) + 18 + idx * bubbleSpacing}
+                cy={midY + 10}
+                r={7}
+                fill={prop.color || '#eee'}
+                stroke="#333"
+                strokeWidth={1}
+                // style={{ cursor: 'pointer', pointerEvents: 'all' }}
+              />
+            </Tooltip>
+          ))}
+        </>
+      )}
+      {isOptional && (
+        <Tooltip
+          title={
+            <>
+              <div style={{fontWeight: 'bold'}}>Optional Join</div>
+              <div style={{marginTop: 4, fontSize: 12, color: '#ffffffff'}}>
+                OPTIONAL MATCH: Get a collection of all nodes connected to <b>{data.source}</b>
+              </div>
+            </>
+          }
+          placement="bottom"
+          overlayStyle={{ zIndex: 9999, maxWidth: 220 }}
+        >
+          <g>
+            <rect
+              x={midX - 18}
+              y={midY + 10}
+              width={36}
+              height={21}
+              rx={8}
+              fill="#ebbcf3ff"
+              stroke="#888"
+              strokeWidth={1}
+              opacity={0.85}
+            />
+            <image
+              href={joinIcon}
+              x={midX - 18}
+              y={midY + 9}
+              width={36}
+              height={20}
+              style={{ pointerEvents: 'none' }}
+            />
+          </g>
+        </Tooltip>
+      )}
       <EdgeModal
         source={data.source}
         destination={data.destination}
@@ -228,13 +375,24 @@ function CustomEdge({
         onClose={() => {setModalVisible(false)}}
         allRs={availRs}
         rs={rs}
+        cardinality={cardinality}
+        isOptional={isOptional}
+        cardinalityProps={cardinalityProps}
         visible={id === state.modalVisible}
         updateEdgeRs={updateEdgeRs}
+        updateEdgeCardinality={updateEdgeCardinality}
+        updateEdgeIsOptional={updateEdgeIsOptional}
         predicates={predicates}
         addPredicate={addPredicate}
         updatePredicate={updatePredicate}
         deletePredicate={deletePredicate}
         propData={propData}
+      />
+      <CardinalityPropsModal
+        visible={cardinalityModalVisible}
+        onClose={() => setCardinalityModalVisible(false)}
+        cardinalityProps={cardinalityProps || []}
+        onSave={updateEdgeCardinalityProps}
       />
     </>
   );

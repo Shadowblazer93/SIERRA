@@ -9,7 +9,7 @@ if (!neo4jVersion.startsWith('4')) {
   database = null;
 }
 
-const driver = neo4j.driver(neo4jUri, neo4j.auth.basic(process.env.NEO4J_USER, process.env.NEO4J_PASSWORD));
+const driver = neo4j.driver("neo4j+s://demo.neo4jlabs.com:7687", neo4j.auth.basic(process.env.NEO4J_USER, process.env.NEO4J_PASSWORD));
 
 // fetch all node entities and list of neighbours for each node entity
 async function setUp() {
@@ -124,11 +124,13 @@ const convertToQuery = (state) => {
     if (curNode.data.predicates) {
       nodePredsArr = Object.keys(curNode.data.predicates).map(function (attr) {
         const preds = curNode.data.predicates[attr].data;
-        var predsStringsArr = preds.map(function (pred) {
-          const op = pred[0];
-          const predVal = typeof pred[1] === 'string' ? `'${pred[1]}'` : pred[1];
-          return `${curNode.data.rep}.${attr} ${Constants.OPERATORS[op]} ${predVal}`;
-        });
+        var predsStringsArr = preds
+          .filter(pred => pred[1] !== '' && pred[1] !== undefined && pred[1] !== null)
+          .map(function (pred) {
+            const op = pred[0];
+            const predVal = typeof pred[1] === 'string' ? `'${pred[1]}'` : pred[1];
+            return `${curNode.data.rep}.${attr} ${Constants.OPERATORS[op]} ${predVal}`;
+          });
         var predsQueryString = predsStringsArr.join(' AND ');
 
         return predsQueryString;
@@ -137,10 +139,39 @@ const convertToQuery = (state) => {
     allPredsArr = allPredsArr.concat(nodePredsArr);
   }
   var allRsQueries = [];
+  var cardinalityWithQueries = [];
+  var cardinalityWhereQueries = [];
+  var blockedReturnNodes = [];
+  var joinNodes = state.nodes.filter(n => n.data.isJoin);
+  console.log("HHH",state.predicateLinks)
+  
+
   for (var i = 0; i < state.edges.length; i++) {
     var srcNode = state.nodes.find((el) => el.id === state.edges[i].source);
     var destNode = state.nodes.find((el) => el.id === state.edges[i].target);
     var qString;
+
+    // cardinality
+    if (state.edges[i].data.cardinality!=undefined) {
+      console.log("HOOYAH",srcNode)
+      const cardinality = state.edges[i].data.cardinality;
+      var min = cardinality.min;
+      var max = cardinality.max;
+
+      if (!(min==1 && max==1)) {
+        if (min!=1) {
+          cardinalityWithQueries.push(`${destNode.data.rep}`)
+          cardinalityWithQueries.push(`count(${srcNode.data.rep}) AS relCount`)
+          cardinalityWhereQueries.push(`relCount = ${min}`)
+          blockedReturnNodes.push(srcNode.data.rep);
+        } else {
+          cardinalityWithQueries.push(`${srcNode.data.rep}`)
+          cardinalityWithQueries.push(`count(${destNode.data.rep}) AS relCount`)
+          cardinalityWhereQueries.push(`relCount = ${max}`)
+          blockedReturnNodes.push(destNode.data.rep);
+        }
+      }
+    }
     // if directed
     if (state.edges[i].arrowHeadType !== '') {
       var rsLabel = 'r' + (i + 10).toString(36);
@@ -153,16 +184,27 @@ const convertToQuery = (state) => {
         if (Object.keys(currEdge.data.predicates).length > 0){
           var edgePredsArr = Object.keys(currEdge.data.predicates).map(function (attr) {
             const preds = currEdge.data.predicates[attr].data;
-            var predsStringsArr = preds.map(function (pred) {
-              const op = pred[0];
-              const predVal = typeof pred[1] === 'string' ? `'${pred[1]}'` : pred[1];
-              return `${rsLabel}.${attr} ${Constants.OPERATORS[op]} ${predVal}`;
-            });
+            var predsStringsArr = preds
+              .filter(pred => pred[1] !== '' && pred[1] !== undefined && pred[1] !== null)
+              .map(function (pred) {
+                const op = pred[0];
+                const predVal = typeof pred[1] === 'string' ? `'${pred[1]}'` : pred[1];
+                return `${rsLabel}.${attr} ${Constants.OPERATORS[op]} ${predVal}`;
+              });
             var predsQueryString = predsStringsArr.join(' AND ');
             return predsQueryString;
           });
           allPredsArr = allPredsArr.concat(edgePredsArr);
         }
+        if (Array.isArray(currEdge.data.cardinalityProps) && currEdge.data.cardinalityProps.length > 0) {
+          currEdge.data.cardinalityProps.forEach(prop => {
+            if (prop.key && prop.value !== undefined && prop.value !== null && prop.value !== '') {
+              const val = typeof prop.value === 'string' ? `'${prop.value}'` : prop.value;
+              allPredsArr.push(`${rsLabel}.${prop.key} = ${val}`);
+            }
+          });
+        }
+        // ----------------------------------------------------
       } else {
         qString = `(${srcNode.data.rep}:${srcNode.data.label})-->(${destNode.data.rep}:${destNode.data.label})`;
       }
@@ -173,6 +215,20 @@ const convertToQuery = (state) => {
     }
     allRsQueries.push(qString);
   }
+
+  if (state.predicateLinks && state.predicateLinks.length > 0) {
+    state.predicateLinks.forEach(link => {
+      // Find the node reps for both ends
+      const fromNode = state.nodes.find(n => n.id === link.from.nodeId);
+      const toNode = state.nodes.find(n => n.id === link.to.nodeId);
+      if (fromNode && toNode && fromNode.data.rep && toNode.data.rep) {
+        allPredsArr.push(`${fromNode.data.rep}.${link.from.attr} = ${toNode.data.rep}.${link.to.attr}`);
+      }
+    });
+  }
+
+  allPredsArr = allPredsArr.filter(Boolean); // Remove falsy (empty) strings
+  allPredsArr = Array.from(new Set(allPredsArr)); // Remove duplicates
 
   var allPredsQueryString = allPredsArr.length > 0 ? 'WHERE ' + allPredsArr.join(' AND ') : '';
 
@@ -186,6 +242,35 @@ const convertToQuery = (state) => {
   }
 
   var allRsQueriesString = allRsQueries.join(', ');
+  var allCardinalityWithString = cardinalityWithQueries.join(', ')
+  var allCardinalityWhereString = cardinalityWhereQueries.join(', ')
+
+  if (joinNodes.length > 0) {
+    var jSymbol = joinNodes[0].data.rep;
+    return `MATCH ${loneQueryString}${allRsQueriesString}
+${allPredsQueryString}
+OPTIONAL MATCH (${jSymbol})--(o)
+RETURN ${jSymbol}, COLLECT(o) AS others`;
+  }
+
+  if (allCardinalityWhereString.length !== 0 || allCardinalityWithString.length !== 0) {
+    if (blockedReturnNodes.length > 0) {
+      returnVars = returnVars.filter(v => !blockedReturnNodes.includes(v));
+    }
+
+    // All predicates (node, edge, relationship properties) go in the first WHERE
+    let whereClause = allPredsArr.length > 0 ? `WHERE ${allPredsArr.join(' AND ')}` : '';
+
+    // Cardinality constraints go in the second WHERE after WITH
+    let withClause = allCardinalityWithString.length > 0 ? `WITH ${allCardinalityWithString}` : '';
+    let cardinalityWhereClause = allCardinalityWhereString.length > 0 ? `WHERE ${allCardinalityWhereString}` : '';
+
+    return `MATCH ${loneQueryString}${allRsQueriesString}
+  ${whereClause}
+  ${withClause}
+  ${cardinalityWhereClause}
+  RETURN ${returnVars.join(', ')}`
+  }
 
   return allPredsQueryString ?
     `MATCH ${loneQueryString}${allRsQueriesString}

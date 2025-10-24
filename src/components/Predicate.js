@@ -13,9 +13,18 @@ function Predicate(props) {
     height: predRadius * 2 + 'px',
     border: '1px solid black',
     borderRadius: '50%',
+    cursor: 'pointer',
+    zIndex: 10,
+    pointerEvents: 'all'
   };
   return (
-      <div style={predicateStyle}/>
+    <div
+      style={predicateStyle}
+      onClick={props.onClick}
+      onMouseEnter={props.onMouseEnter}
+      onMouseLeave={props.onMouseLeave}
+      title={props.title || ''}
+    />
   );
 }
 

@@ -9,6 +9,7 @@ import Help from './components/Help';
 import SearchResults from './components/SearchResults';
 import { Context } from './Store';
 import CustomEdge from './components/CustomEdge';
+import PredicateLinkEdge from './components/PredicateLinkEdge';
 import ConfirmationAlert from './components/ConfirmationAlert';
 import {Button, Spin} from 'antd';
 import {InfoCircleOutlined, CopyOutlined, LoadingOutlined} from '@ant-design/icons'
@@ -25,7 +26,7 @@ function App() {
   const [showResults, setShowResults] = useState(false);
   const [searchResult, setSearchResult] = useState([]);
   const [toastInfo, setToastInfo] = useState({ show: false, msg: '', confirm: function () {} });
-  const [cypherQuery, setCypherQuery] = useState('')
+  const [cypherQuery, setCypherQuery] = useState('');
 
   //* only for user study
   // const [userStudyDataset, setUserStudyDataset] = useState('Northwind')
@@ -115,6 +116,21 @@ function App() {
     })
   }
 
+  const predicateLinkElements = state.predicateLinks.length > 0
+    ? state.predicateLinks.map((link, idx) => ({
+        id: `predicate-link-${idx}`,
+        source: link.from.nodeId,
+        target: link.to.nodeId,
+        sourceHandle: link.from.attr,
+        targetHandle: link.to.attr,
+        type: 'predicateLink', // This will use PredicateLinkEdge
+        data: {
+          fromAttr: link.from.attr,
+          toAttr: link.to.attr,
+        }
+      }))
+    : [];
+
   const renderContent = () => {
     if(pageStatus  === "LOADING") {
       return (
@@ -154,15 +170,36 @@ function App() {
             <CypherTextEditor text={cypherQuery}/>
 
             <ReactFlow
-              elements={state.nodes.map(
-                  n => ({...n, data: {...n.data, color: n.color,radius:  n.radius, isBold: n.isBold}})
-                )
-                .concat(state.edges.map(
-                  e => ({...e, data: {...e.data, isBold: e.isBold}})
-                  ))}
+              elements={
+                state.nodes.map(
+                  n => ({
+                    ...n,
+                    data: {
+                      ...n.data,
+                      color: n.color,
+                      radius: n.radius,
+                      isBold: n.isBold
+                    }
+                  })
+                ).concat(
+                  state.edges.map(e => {
+                    const sourceNode = state.nodes.find(n => n.id === e.source);
+                    const targetNode = state.nodes.find(n => n.id === e.target);
+                    return {
+                      ...e,
+                      data: {
+                        ...e.data,
+                        isBold: e.isBold,
+                        sourcePredicates: sourceNode?.data?.predicates || {},
+                        targetPredicates: targetNode?.data?.predicates || {},
+                      }
+                    };
+                  })
+                ).concat(predicateLinkElements)
+              }
               style={{ width: '100%', height: '100vh' }}
               nodeTypes={{ special: Node }}
-              edgeTypes={{ custom: CustomEdge }}
+              edgeTypes={{ custom: CustomEdge, predicateLink: PredicateLinkEdge }}
               onElementsRemove={(elementsToRemove) =>
                 setToastInfo({
                   show: true,

@@ -34,6 +34,7 @@ const EdgeModal = ({
   const [cardinalityProps, setCardinalityProps] = useState([]);
   const rsOptions = Object.keys(allRs ?? {})
   const rsAttributes = rs && allRs[rs] ? allRs[rs] : []
+  const rsAttributes = rs && allRs[rs] ? allRs[rs] : []
 
   const showChildrenDrawer = (attr) => {
     setChildDrawer({

@@ -31,6 +31,7 @@ function CustomEdge({
   markerEndId,
 }) {
   console.log("CustomEdge data:", data);
+  console.log("CustomEdge data:", data);
 
   const VA = useVisualActions()
   const [directed, setDirected] = useState(true);
@@ -253,6 +254,7 @@ function CustomEdge({
 
       </path>
       {preds()}
+      )
       )
 
       <text dy="-10px">

@@ -1,0 +1,31 @@
+{
+  "files": {
+    "name": "marketplace",
+    "short_name": "marketplace",
+    "start_url": "index.html",
+    "display": "standalone",
+    "icons": [
+      {
+        "src": "favicon.ico",
+        "sizes": "512x512",
+        "type": "image/x-icon"
+      }
+    ],
+    "background_color": "#4e0041",
+    "theme_color": "#4e0041",
+    "main.css": ".assets/css/main.5306307b1a97fdbb9be6.css",
+    "main.js": ".assets/js/main.05b30d0e.bundle.js",
+    "main.png": ".assets/images/join_icon.bca57eba9c33f5b3e9ebf44ee31cbde8.png",
+    "assets/css/889.5306307b1a97fdbb9be6.css": ".assets/css/889.5306307b1a97fdbb9be6.css",
+    "assets/js/889.bdb0471a.bundle.js": ".assets/js/889.bdb0471a.bundle.js",
+    "assets/images/join_icon.png": ".assets/images/join_icon.bca57eba9c33f5b3e9ebf44ee31cbde8.png",
+    "public/favicon.ico": ".favicon.ico",
+    "index.html": ".index.html"
+  },
+  "entrypoints": [
+    "assets/css/889.5306307b1a97fdbb9be6.css",
+    "assets/js/889.bdb0471a.bundle.js",
+    "assets/css/main.5306307b1a97fdbb9be6.css",
+    "assets/js/main.05b30d0e.bundle.js"
+  ]
+}

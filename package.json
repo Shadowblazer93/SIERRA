@@ -1,7 +1,7 @@
 {
   "name": "sierra",
   "version": "0.1.0",
-  "homepage": "https://Shadowblazer93.github.io/SIERRA",
+  "homepage": ".",
   "private": false,
   "browserslist": {
     "production": [

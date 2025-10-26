@@ -88,6 +88,18 @@ function App() {
   };
 
   const onConnect = (params) => {
+    console.log("HANDLE CONNECTION",params)
+    if (params.sourceHandle && params.targetHandle) {
+      dispatch({
+        type: 'ADD_PREDICATE_LINK',
+        payload: {
+          from: { nodeId: params.source, attr: params.sourceHandle },
+          to:   { nodeId: params.target, attr: params.targetHandle }
+        }
+      });
+      return; // don't fall through to normal node-edge logic
+    }
+
     const src = state.nodes.find((el) => el.id === params.source);
     const dest = state.nodes.find((el) => el.id === params.target);
     const srcNeighbours = state.neighbours[src.data.label].map((rs) => {
@@ -123,7 +135,7 @@ function App() {
         target: link.to.nodeId,
         sourceHandle: link.from.attr,
         targetHandle: link.to.attr,
-        type: 'predicateLink', // This will use PredicateLinkEdge
+        type: 'predicateLink',
         data: {
           fromAttr: link.from.attr,
           toAttr: link.to.attr,
@@ -134,9 +146,16 @@ function App() {
   const renderContent = () => {
     if(pageStatus  === "LOADING") {
       return (
-      <div style={{width: '100vw', height: '100vh'}}>
-        <Spin indicator={<LoadingOutlined style={{ fontSize: 42 }} spin />} style={{margin:'35% 50%'}} />
-      </div>)
+        <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', backgroundImage: 'radial-gradient(circle, rgba(0,0,0,0.08) 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
+          <div className="spinner-layer" aria-hidden>
+            <LoadingOutlined className="spin spin-1" />
+            <LoadingOutlined className="spin spin-2" />
+            <LoadingOutlined className="spin spin-3" />
+          </div>
+          <Title style={{ color: '#0b3d91', fontSize: 70, fontFamily: 'monospace', fontWeight: 700}}>SIERRA</Title>
+          <div style={{ marginTop: -40, color: '#6b7280', fontSize: 20, fontFamily: 'monospace' }}>Loading...</div>
+        </div>
+      )
     } else if (pageStatus === "READY") {
       return (
         <>

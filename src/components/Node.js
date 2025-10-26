@@ -67,21 +67,22 @@ function Node(props) {
   }
 
   const handlePredicateClick = (attr, circle) => {
-    const thisPredicate = { nodeId: props.id, attr };
-    if (
-      state.linkingPredicate &&
-      (state.linkingPredicate.nodeId !== props.id || state.linkingPredicate.attr !== attr)
-    ) {
-      dispatch({
-        type: 'ADD_PREDICATE_LINK',
-        payload: { from: state.linkingPredicate, to: thisPredicate }
-      });
-    } else {
-      dispatch({
-        type: 'SET_LINKING_PREDICATE',
-        payload: thisPredicate
-      });
-    }
+    setHoveredPredicate(attr);
+    // const thisPredicate = { nodeId: props.id, attr };
+    // if (
+    //   state.linkingPredicate &&
+    //   (state.linkingPredicate.nodeId !== props.id || state.linkingPredicate.attr !== attr)
+    // ) {
+    //   dispatch({
+    //     type: 'ADD_PREDICATE_LINK',
+    //     payload: { from: state.linkingPredicate, to: thisPredicate }
+    //   });
+    // } else {
+    //   dispatch({
+    //     type: 'SET_LINKING_PREDICATE',
+    //     payload: thisPredicate
+    //   });
+    // }
   };
 
   const setShowDetails = (bool) => {
@@ -299,13 +300,10 @@ function Node(props) {
                 left: x,
                 top: y,
                 zIndex: 10,
-                pointerEvents: 'all',
+                pointerEvents: 'none',
                 cursor: 'pointer',
-                border: isHovered || isLinking ? '2px solid #800080' : '1px solid black',
-                transition: 'border 0.2s'
+                border: isHovered || isLinking ? '2px solid #800080' : '0px solid black',
               }}
-              onMouseEnter={() => setHoveredPredicate(attr)}
-              onMouseLeave={() => setHoveredPredicate(null)}
               onClick={() => handlePredicateClick(attr, circle)}
             />
             <Handle
@@ -313,34 +311,43 @@ function Node(props) {
               position="top"
               id={attr}
               style={{
-                left: x - 40,
-                top: y + 5,
+                left: x+8,
+                top: y,
                 position: 'absolute',
                 background: 'transparent',
                 border: 'none',
-                width: 0,
-                height: 0,
-                pointerEvents: 'none',
-                zIndex: 20
+                width: 16,
+                height: 16,
+                pointerEvents: 'all',
+                zIndex: 30,
+                border: isHovered || isLinking ? '2px solid #800080' : '0px solid black',
+                clipPath: 'polygon(0 50%, 100% 50%, 100% 100%, 0 100%)',
               }}
-              isConnectable={false}
+              isConnectable={true}
+              onMouseEnter={() => setHoveredPredicate(attr)}
+              onMouseLeave={() => setHoveredPredicate(null)}
             />
             <Handle
               type="target"
               position="top"
               id={attr}
               style={{
-                left: x - 40,
-                top: y + 5,
+                left: x+8,
+                top: y,
                 position: 'absolute',
                 background: 'transparent',
                 border: 'none',
-                width: 0,
-                height: 0,
-                pointerEvents: 'none',
-                zIndex: 20
+                width: 16,
+                height: 16,
+                pointerEvents: 'all',
+                zIndex: 40,
+                border: isHovered || isLinking ? '2px solid #800080' : '0px solid black',
+                clipPath: 'polygon(0 0, 100% 0, 100% 50%, 0 50%)',
+                transition: 'border 0.2s'
               }}
-              isConnectable={false}
+              isConnectable={true}
+              onMouseEnter={() => setHoveredPredicate(attr)}
+              onMouseLeave={() => setHoveredPredicate(null)}
             />
           </React.Fragment>
         );

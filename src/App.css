@@ -113,3 +113,31 @@ td {
 .ant-tooltip-inner {
   border-radius: 8px !important;
 }
+
+.spinner-layer {
+  position: relative;
+  width: 140px;
+  height: 140px;
+}
+
+.spinner-layer .spin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  color: #8a2be2;
+  opacity: 0.9;
+}
+
+.spinner-layer .spin-1 { font-size: 96px; animation: spin-cw 1.6s linear infinite; color: #3caeff; }
+.spinner-layer .spin-2 { font-size: 70px; animation: spin-ccw 1.2s linear infinite; color: rgb(77, 140, 250); }
+.spinner-layer .spin-3 { font-size: 44px; animation: spin-cw 0.9s linear infinite; color: rgb(21, 80, 218); }
+
+@keyframes spin-cw {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+@keyframes spin-ccw {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(-360deg); }
+}

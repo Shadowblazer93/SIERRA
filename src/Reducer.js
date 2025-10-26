@@ -51,12 +51,26 @@ const Reducer = (state, action) => {
         ...state,
         linkingPredicate: action.payload
       };
-    case 'ADD_PREDICATE_LINK':
+    case 'ADD_PREDICATE_LINK': {
+      const newLink = action.payload;
+      const exists = state.predicateLinks.some(link =>
+        link.from.nodeId === newLink.from.nodeId &&
+        link.from.attr === newLink.from.attr &&
+        link.to.nodeId === newLink.to.nodeId &&
+        link.to.attr === newLink.to.attr
+      );
+      if (exists) return { ...state, linkingPredicate: null }; // already exists, just reset linking state
+
+      // optional: prevent linking a predicate to itself
+      const isSelf = newLink.from.nodeId === newLink.to.nodeId && newLink.from.attr === newLink.to.attr;
+      if (isSelf) return { ...state, linkingPredicate: null };
+
       return {
         ...state,
-        predicateLinks: [...state.predicateLinks, action.payload],
-        linkingPredicate: null // reset after linking
+        predicateLinks: [...state.predicateLinks, newLink],
+        linkingPredicate: null
       };
+    }
       case 'UPDATE_PREDICATE': {
         const { nodeId, attr, newPred } = action.payload;
         // Remove links involving this predicate if the predicate is now empty or changed

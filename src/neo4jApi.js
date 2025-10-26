@@ -172,28 +172,6 @@ const convertToQuery = (state) => {
         }
       }
     }
-
-    // cardinality
-    if (state.edges[i].data.cardinality!=undefined) {
-      console.log("HOOYAH",srcNode)
-      const cardinality = state.edges[i].data.cardinality;
-      var min = cardinality.min;
-      var max = cardinality.max;
-
-      if (!(min==1 && max==1)) {
-        if (min!=1) {
-          cardinalityWithQueries.push(`${destNode.data.rep}`)
-          cardinalityWithQueries.push(`count(${srcNode.data.rep}) AS relCount`)
-          cardinalityWhereQueries.push(`relCount = ${min}`)
-          blockedReturnNodes.push(srcNode.data.rep);
-        } else {
-          cardinalityWithQueries.push(`${srcNode.data.rep}`)
-          cardinalityWithQueries.push(`count(${destNode.data.rep}) AS relCount`)
-          cardinalityWhereQueries.push(`relCount = ${max}`)
-          blockedReturnNodes.push(destNode.data.rep);
-        }
-      }
-    }
     // if directed
     if (state.edges[i].arrowHeadType !== '') {
       var rsLabel = 'r' + (i + 10).toString(36);
@@ -288,10 +266,10 @@ RETURN ${jSymbol}, COLLECT(o) AS others`;
     let cardinalityWhereClause = allCardinalityWhereString.length > 0 ? `WHERE ${allCardinalityWhereString}` : '';
 
     return `MATCH ${loneQueryString}${allRsQueriesString}
-  ${whereClause}
-  ${withClause}
-  ${cardinalityWhereClause}
-  RETURN ${returnVars.join(', ')}`
+${whereClause}
+${withClause}
+${cardinalityWhereClause}
+RETURN ${returnVars.join(', ')}`
   }
 
   return allPredsQueryString ?

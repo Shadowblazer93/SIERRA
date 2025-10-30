@@ -264,9 +264,10 @@ RETURN ${jSymbol}, COLLECT(o) AS others`;
     // Cardinality constraints go in the second WHERE after WITH
     let withClause = allCardinalityWithString.length > 0 ? `WITH ${allCardinalityWithString}` : '';
     let cardinalityWhereClause = allCardinalityWhereString.length > 0 ? `WHERE ${allCardinalityWhereString}` : '';
+    let newLineWhereClause = Boolean(whereClause) ?`
+` : ``;
 
-    return `MATCH ${loneQueryString}${allRsQueriesString}
-${whereClause}
+    return `MATCH ${loneQueryString}${allRsQueriesString}${newLineWhereClause}${whereClause}
 ${withClause}
 ${cardinalityWhereClause}
 RETURN ${returnVars.join(', ')}`

@@ -303,7 +303,7 @@ function CustomEdge({
                 x={midX}
                 y={midY}
                 textAnchor="middle"
-                alignmentBaseline="middle"
+                // alignmentBaseline="middle"
                 fontSize="12"
                 fontWeight="bold"
                 fill="#333"

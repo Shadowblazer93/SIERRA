@@ -315,12 +315,12 @@ function Node(props) {
                 top: y,
                 position: 'absolute',
                 background: 'transparent',
-                border: 'none',
                 width: 16,
                 height: 16,
                 pointerEvents: 'all',
                 zIndex: 30,
-                border: isHovered || isLinking ? '2px solid #800080' : '0px solid black',
+                border: isHovered || isLinking ? '2px solid #800080' : '2px solid transparent',
+                transition: 'border 0.2s ease',
                 clipPath: 'polygon(0 50%, 100% 50%, 100% 100%, 0 100%)',
               }}
               isConnectable={true}
@@ -336,14 +336,13 @@ function Node(props) {
                 top: y,
                 position: 'absolute',
                 background: 'transparent',
-                border: 'none',
                 width: 16,
                 height: 16,
                 pointerEvents: 'all',
                 zIndex: 40,
-                border: isHovered || isLinking ? '2px solid #800080' : '0px solid black',
+                border: isHovered || isLinking ? '2px solid #800080' : '2px solid transparent',
                 clipPath: 'polygon(0 0, 100% 0, 100% 50%, 0 50%)',
-                transition: 'border 0.2s'
+                transition: 'border 0.2s ease'
               }}
               isConnectable={true}
               onMouseEnter={() => setHoveredPredicate(attr)}

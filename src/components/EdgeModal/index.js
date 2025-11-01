@@ -30,6 +30,7 @@ const EdgeModal = ({
   const [state, dispatch] = useContext(Context);
   const [childrenDrawer, setChildDrawer] = useState({});
   const [cardinality, setCardinality] = useState({ min: 1, max: 1 });
+  const [cardOp, setCardOp] = useState('=');
   const [isOptional, setIsOptional] = useState(false);
   const [cardinalityProps, setCardinalityProps] = useState([]);
   const rsOptions = Object.keys(allRs ?? {})
@@ -171,7 +172,7 @@ const EdgeModal = ({
 
         {/* Cardinality */}
           <Divider orientation="left">Cardinality</Divider>
-          <div style={{padding: '0px 15px 10px'}}>
+          <div style={{padding: '0px 15px 10px', display: 'flex', alignItems: 'center', gap: 8}}>
             <InputNumber
               min={0}
               value={cardinality.min}
@@ -179,9 +180,9 @@ const EdgeModal = ({
               onChange={(val) => {
                 const newCard = { min: val, max: 1 };
                 setCardinality(newCard);
-                updateEdgeCardinality(newCard);
+                updateEdgeCardinality({ ...newCard, op: cardOp });
               }}
-              style={{width: 60, marginRight: 8}}
+              style={{width: 60}}
             />
             to
             <InputNumber
@@ -191,16 +192,26 @@ const EdgeModal = ({
               onChange={(val) => {
                 const newCard = { min: 1, max: val };
                 setCardinality(newCard);
-                updateEdgeCardinality(newCard);
+                updateEdgeCardinality({ ...newCard, op: cardOp });
               }}
-              style={{width: 60, marginLeft: 8}}
+              style={{width: 60}}
             />
+            <Select value={cardOp} onChange={(val) => {
+              setCardOp(val);
+              updateEdgeCardinality({ ...cardinality, op: val });
+            }} style={{ width: 80 }}>
+              <Option value="=">{'='}</Option>
+              <Option value=">">{'>'}</Option>
+              <Option value="<">{'<'}</Option>
+              <Option value="<>">{'!='}</Option>
+            </Select>
             <Button
               style={{marginLeft: 16}}
               onClick={() => {
                 const resetCard = { min: 1, max: 1 };
                 setCardinality(resetCard);
-                updateEdgeCardinality(resetCard);
+                setCardOp('=');
+                updateEdgeCardinality({ ...resetCard, op: '=' });
               }}
             >
               Reset

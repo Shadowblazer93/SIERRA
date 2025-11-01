@@ -270,7 +270,7 @@ function CustomEdge({
               <>
                 <div style={{fontWeight: 'bold'}}>Cardinality: {cardinality.min} to {cardinality.max}</div>
                 <div style={{marginTop: 4, fontSize: 12, color: '#ffffffff'}}>
-                  For every {cardinality.min} relationship(s) of <b>{data.source}</b>, there are {cardinality.max} relationships of <b>{data.destination}</b>.
+                  For every {cardinality.min} relationship(s) of <b>{data.source}</b>, there is {cardinality.max} relationships of <b>{data.destination}</b>.
                 </div>
               </>
             }
@@ -395,6 +395,8 @@ function CustomEdge({
         onClose={() => setCardinalityModalVisible(false)}
         cardinalityProps={cardinalityProps || []}
         onSave={updateEdgeCardinalityProps}
+        cardinality={cardinality}
+        onChangeCardinality={updateEdgeCardinality}
       />
     </>
   );

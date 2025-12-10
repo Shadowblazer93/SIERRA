@@ -232,7 +232,7 @@ function CustomEdge({
   const midX = (sourceX + targetX) / 2;
   const midY = (sourceY + targetY) / 2 + 10;
 
-  const baseWidth = 36;
+  const baseWidth = 60;
   const bubbleSpacing = 22;
   const numBubbles = Array.isArray(cardinalityProps) ? cardinalityProps.length : 0;
   const boxWidth = baseWidth + Math.max(0, numBubbles - 1) * bubbleSpacing;
@@ -257,7 +257,7 @@ function CustomEdge({
       )
       )
 
-      <text dy="-10px">
+      <text dy="-15px">
         <textPath href={`#${id}`} style={{ fontSize: '1rem' }} startOffset="50%" textAnchor="middle">
           {rs}
         </textPath>
@@ -290,7 +290,7 @@ function CustomEdge({
             >
               <rect
                 x={midX - boxWidth / 2}
-                y={midY - 14}
+                y={midY - 20}
                 width={boxWidth}
                 height={20}
                 rx={6}
@@ -301,7 +301,7 @@ function CustomEdge({
               />
               <text
                 x={midX}
-                y={midY}
+                y={midY - 5}
                 textAnchor="middle"
                 // alignmentBaseline="middle"
                 fontSize="12"
@@ -321,8 +321,8 @@ function CustomEdge({
               overlayStyle={{ zIndex: 9999 }}
             >
               <circle
-                cx={midX - (boxWidth / 2) + 18 + idx * bubbleSpacing}
-                cy={midY + 10}
+                cx={midX - (boxWidth / 2) + 30 + idx * bubbleSpacing}
+                cy={midY + 3}
                 r={7}
                 fill={prop.color || '#eee'}
                 stroke="#333"

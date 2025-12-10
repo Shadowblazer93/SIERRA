@@ -11,11 +11,13 @@ import { Context } from './Store';
 import CustomEdge from './components/CustomEdge';
 import PredicateLinkEdge from './components/PredicateLinkEdge';
 import ConfirmationAlert from './components/ConfirmationAlert';
-import {Button, Spin} from 'antd';
+import {Button, Spin, Select} from 'antd';
 import {InfoCircleOutlined, CopyOutlined, LoadingOutlined} from '@ant-design/icons'
 import Title from 'antd/lib/typography/Title';
 import { getNodeId } from './utils/getNodeId';
 import useVisualActions from './hooks/useVisualActions'
+const neo4jApi = require('./neo4jApi')
+const pkg = require('../package.json')
 
 const api = require('./neo4jApi');
 
@@ -27,6 +29,7 @@ function App() {
   const [searchResult, setSearchResult] = useState([]);
   const [toastInfo, setToastInfo] = useState({ show: false, msg: '', confirm: function () {} });
   const [cypherQuery, setCypherQuery] = useState('');
+  const [databaseSource, setDatabaseSource] = useState('northwind')
 
   //* only for user study
   // const [userStudyDataset, setUserStudyDataset] = useState('Northwind')
@@ -57,6 +60,28 @@ function App() {
     });
 
   }, []);
+
+  useEffect(() => {
+    // when DB source changes: show loading, recreate driver, re-fetch data
+    let mounted = true;
+    (async () => {
+      setPageStatus('LOADING');
+      if (typeof api.setDatabase === 'function') {
+        await api.setDatabase(databaseSource);
+      }
+      try {
+        const result = await api.setUp();
+        const props = await api.getProperties(result.entities);
+        if (!mounted) return;
+        dispatch({ type: 'SET_DATA', payload: { entities: result.entities, neighbours: result.neighbours, props } });
+        setPageStatus('READY');
+      } catch (e) {
+        console.error('Error reloading data after DB change', e);
+        if (mounted) setPageStatus('READY');
+      }
+    })();
+    return () => { mounted = false; }
+  }, [databaseSource]);
 
   const _internalDispatchPredDisplayStatus = (val) => {
     dispatch({
@@ -154,6 +179,22 @@ function App() {
           </div>
           <Title style={{ color: '#0b3d91', fontSize: 70, fontFamily: 'monospace', fontWeight: 700}}>SIERRA</Title>
           <div style={{ marginTop: -40, color: '#6b7280', fontSize: 20, fontFamily: 'monospace' }}>Loading...</div>
+
+          {/* version badge */}
+          <div style={{
+            position: 'fixed',
+            right: 12,
+            bottom: 8,
+            fontSize: 12,
+            fontWeight: 500,
+            color: '#000000ff',
+            background: 'rgba(120, 192, 255, 0.7)',
+            padding: '4px 8px',
+            borderRadius: 6,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
+          }}>
+            v{pkg.version}
+          </div>
         </div>
       )
     } else if (pageStatus === "READY") {
@@ -167,6 +208,25 @@ function App() {
                 level={3}>
                   SIERRA
               </Title>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 7 }}>
+                <Select
+                  value={databaseSource}
+                  onChange={setDatabaseSource}
+                  style={{ width: 160 }}
+                  size="middle"
+                >
+                  <Select.Option value="recommendations">Recommendations</Select.Option>
+                  <Select.Option value="movies">Movies</Select.Option>
+                  <Select.Option value="northwind">NorthWind</Select.Option>
+                  <Select.Option value="fincen">Fincen</Select.Option>
+                  <Select.Option value="twitter">Twitter</Select.Option>
+                  <Select.Option value="stackoverflow">StackOverFlow</Select.Option>
+                  <Select.Option value="gameofthrones">GameOfThrones</Select.Option>
+                  <Select.Option value="neoflix">NeoFlix</Select.Option>
+                  <Select.Option value="wordnet">WordNet</Select.Option>
+                  <Select.Option value="slack">Slack</Select.Option>
+                </Select>
+              </div>
               <NewNodeDrawButton addNode={addNode} />
               <PredicateDisplayDropDown value={state.predDisplayStatus} onSelect={_internalDispatchPredDisplayStatus} />
               {/* <UserStudyDatasetDropDown value={userStudyDataset} onSelect={setUserStudyDataset} /> */}

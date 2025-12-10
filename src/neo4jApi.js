@@ -4,12 +4,29 @@ const Constants = require('./constants');
 
 const neo4jUri = process.env.NEO4J_URI;
 const neo4jVersion = process.env.NEO4J_VERSION;
-let database = process.env.NEO4J_DATABASE;
+let database = 'northwind';
+let user = database;
+let password = database;
+
 if (!neo4jVersion.startsWith('4')) {
   database = null;
 }
+function createDriver() {
+  return neo4j.driver("neo4j+s://demo.neo4jlabs.com:7687",neo4j.auth.basic(user, password));
+}
+async function setDatabase(db) {
+  database = db && db.length ? db : process.env.NEO4J_DATABASE;
+  user = database;
+  password = database;
+  await driver.close();
+  driver = createDriver();
+  return database;
+}
+function getDatabase(db) {
+  return database;
+}
 
-const driver = neo4j.driver("neo4j+s://demo.neo4jlabs.com:7687", neo4j.auth.basic(process.env.NEO4J_USER, process.env.NEO4J_PASSWORD));
+let driver = neo4j.driver("neo4j+s://demo.neo4jlabs.com:7687", neo4j.auth.basic(user, password));
 
 // fetch all node entities and list of neighbours for each node entity
 async function setUp() {
@@ -340,3 +357,5 @@ exports.runQuery = runQuery;
 exports.fetchPropertyValues = fetchPropertyValues;
 exports.fetchEdgePropertyValues = fetchEdgePropertyValues;
 exports.convertToQuery = convertToQuery;
+exports.setDatabase = setDatabase;
+exports.getDatabase = getDatabase;

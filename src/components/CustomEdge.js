@@ -14,6 +14,36 @@ import joinIcon from '../assets/images/join_icon.png';
 
 const api = require('../neo4jApi');
 
+const CardinalityButton = ({ onClick, direction, style }) => {
+  const [hover, setHover] = useState(false);
+  const color = hover ? '#1890ff' : '#8c8c8c';
+  const borderColor = hover ? '#1890ff' : '#d9d9d9';
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        ...style,
+        borderColor,
+        zIndex: hover ? 10 : 1,
+        transition: 'border-color 0.1s ease-in-out'
+      }}
+    >
+      <svg width="5" height="4" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path
+          d={direction === 'up' ? "M1 6L6 1L11 6" : "M1 2L6 7L11 2"}
+          style={{ stroke: color, transition: 'stroke 0.1s ease-in-out' }}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
+  );
+};
+
 function CustomEdge({
   id,
   sourceX,
@@ -25,6 +55,7 @@ function CustomEdge({
   style = {
     stroke: 'darkgrey',
     strokeWidth: '3',
+    cursor: 'pointer'
   },
   data,
   arrowHeadType,
@@ -38,6 +69,7 @@ function CustomEdge({
   const [state, dispatch] = useContext(Context);
   const [propData, setPropData] = useState([]);
   const [cardinalityModalVisible, setCardinalityModalVisible] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const edgePath = `M ${sourceX}, ${sourceY}L ${targetX}, ${targetY}`
   const markerEnd = getMarkerEnd(directed === true ? arrowHeadType : '', markerEndId);
@@ -121,6 +153,17 @@ function CustomEdge({
     });
     _internalDispatchGraph(graph);
   }
+
+  const handleCardinalityChange = (key, value) => {
+    if (value === '') {
+      updateEdgeCardinality({ ...cardinality, [key]: 1 });
+      return;
+    }
+
+    if (/^\d+$/.test(value)) {
+      updateEdgeCardinality({ ...cardinality, [key]: value });
+    }
+  };
 
   const addPredicate = (attr, color) => {
     const graph = VA.add(state, "PREDICATE", {
@@ -237,6 +280,22 @@ function CustomEdge({
   const numBubbles = Array.isArray(cardinalityProps) ? cardinalityProps.length : 0;
   const boxWidth = baseWidth + Math.max(0, numBubbles - 1) * bubbleSpacing;
 
+  const btnStyle = {
+    width: 7,
+    height: 8,
+    padding: 0,
+    cursor: 'pointer',
+    border: '1px solid #d9d9d9',
+    borderRadius: '2px',
+    background: isHovered ? '#b5ddffff' : '#fff',
+    outline: 'none',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    transition: isHovered ? 'all 0.2s ease' : 'none' 
+  };
+
   return (
     <>
       <path
@@ -283,33 +342,133 @@ function CustomEdge({
           >
             <g
               style={{ cursor: 'pointer' }}
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
               onClick={e => {
                 e.stopPropagation();
                 setCardinalityModalVisible(true);
-              }}
-            >
-              <rect
+                }}
+                >
+                <rect
+                className={`card-rect-${id}`}
                 x={midX - boxWidth / 2}
                 y={midY - 20}
                 width={boxWidth}
                 height={20}
                 rx={6}
-                fill="#fff"
-                stroke="#888"
+                fill={isHovered ? "#e6f7ff" : "#fff"}
+                stroke={isHovered ? "#51abffff" : "#888"}
                 strokeWidth={1}
                 opacity={0.85}
-              />
-              <text
-                x={midX}
-                y={midY - 5}
-                textAnchor="middle"
-                // alignmentBaseline="middle"
-                fontSize="12"
-                fontWeight="bold"
-                fill="#333"
-              >
-                {cardinality.min} → {cardinality.max}
-              </text>
+                style={{ transition: isHovered ? 'fill 0.2s ease, stroke 0.2s ease' : 'none' }}
+                />
+                <foreignObject
+                x={midX - boxWidth / 2}
+                y={midY - 20}
+                width={boxWidth}
+                height={20}
+                >
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  height: '100%',
+                  width: '100%',
+                  pointerEvents: 'none'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', pointerEvents: 'auto' }}>
+                  <input
+                  type="text"
+                  value={cardinality.min}
+                  onChange={(e) => handleCardinalityChange('min', e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  style={{
+                  width: numBubbles<=1 ? '10px' : '25px',
+                  height: '16px',
+                  fontSize: '10px',
+                  textAlign: 'center',
+                  border: 'none',
+                  background: isHovered ? '#b5ddffff' : '#ebebeb',
+                  borderRadius: '5px',
+                  padding: 0,
+                  margin: 0,
+                  marginRight: 1,
+                  outline: 'none',
+                  fontWeight: 'bold',
+                  color: cardinality.max>1 ? '#666' : '#333',
+                  transition: isHovered ? 'all 0.2s ease' : 'none' 
+                  }}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', marginLeft: 0 }}>
+                  <CardinalityButton
+                  direction="up"
+                  onClick={(e) => {
+                          e.stopPropagation();
+                          const val = parseInt(cardinality.min) || 0;
+                          updateEdgeCardinality({ ...cardinality, min: val + 1 });
+                        }}
+                        style={btnStyle}
+                      />
+                      <CardinalityButton
+                        direction="down"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const val = parseInt(cardinality.min) || 0;
+                          updateEdgeCardinality({ ...cardinality, min: val - 1 });
+                        }}
+                        style={{ ...btnStyle, marginTop: -1 }}
+                      />
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '10px', margin: '0 2px', fontWeight: 'bold', color: '#333' }}>→</span>
+                  <div style={{ display: 'flex', alignItems: 'center', pointerEvents: 'auto' }}>
+                    <input
+                      type="text"
+                      value={cardinality.max}
+                      onChange={(e) => handleCardinalityChange('max', e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      style={{
+                        width: numBubbles<=1 ? '10px' : '25px',
+                        height: '16px',
+                        fontSize: '10px',
+                        textAlign: 'center',
+                        border: 'none',
+                        background: isHovered ? '#b5ddffff' : '#ebebeb',
+                        borderRadius: '5px',
+                        padding: 0,
+                        margin: 0,
+                        marginRight: 1,
+                        outline: 'none',
+                        fontWeight: 'bold',
+                        color: cardinality.min>1 ? '#666' : '#333',
+                        transition: isHovered ? 'all 0.2s ease' : 'none' 
+                      }}
+                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', marginLeft: 0 }}>
+                      <CardinalityButton
+                        direction="up"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const val = parseInt(cardinality.max) || 0;
+                          updateEdgeCardinality({ ...cardinality, max: val + 1 });
+                        }}
+                        style={btnStyle}
+                      />
+                      <CardinalityButton
+                        direction="down"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const val = parseInt(cardinality.max) || 0;
+                          updateEdgeCardinality({ ...cardinality, max: val - 1 });
+                        }}
+                        style={{ ...btnStyle, marginTop: -1 }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </foreignObject>
             </g>
           </Tooltip>
           {/* Render property bubbles as separate elements, overlaid above the box */}

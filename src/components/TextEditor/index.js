@@ -1,6 +1,7 @@
 import React, {useContext, useState} from 'react';
 import { Button, Typography, message } from 'antd';
 import {CopyOutlined} from '@ant-design/icons'
+import { BsArrowsAngleExpand } from 'react-icons/bs';
 import CodeMirror from "@uiw/react-codemirror";
 import { StreamLanguage } from "@codemirror/stream-parser";
 import { cypher } from "@codemirror/legacy-modes/mode/cypher";
@@ -20,6 +21,8 @@ export default function({text}){
   const VA = useVisualActions()
   const [innerText, setInnerText] = useState(text)
   const [showQuery, setShowQuery] = useState(false);
+  const [dimensions, setDimensions] = useState({ width: 490, height: 280 });
+
   const onCopy = () => {
     if(innerText){
       navigator.clipboard.writeText(innerText).then(() => {
@@ -27,6 +30,32 @@ export default function({text}){
       })
     }
   }
+
+  const handleResizeMouseDown = (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = dimensions.width;
+    const startHeight = dimensions.height;
+
+    const onMouseMove = (moveEvent) => {
+      const deltaX = startX - moveEvent.clientX; // Dragging left increases width because it's anchored right
+      const deltaY = moveEvent.clientY - startY; // Dragging down increases height
+      setDimensions({
+        width: Math.max(300, startWidth + deltaX),
+        height: Math.max(200, startHeight + deltaY)
+      });
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  };
+
 
 
   const handleSearch = () => {
@@ -183,7 +212,14 @@ export default function({text}){
         {showQuery ? "Hide Cypher Query" : "Show Cypher Query"}
       </Button>
       {showQuery && (
-        <div style={{background: '#fff'}} className="text-container">
+        <div 
+          style={{
+            background: '#fff', 
+            width: dimensions.width, 
+            height: dimensions.height
+          }} 
+          className="text-container"
+        >
           <div style ={{display: 'flex', flexDirection: 'row', justifyContent:'space-between'}}>
             <Title level={5}>Cypher Query</Title>
             <CopyOutlined
@@ -207,12 +243,28 @@ export default function({text}){
           </div>
           <CodeMirror
             value={text}
-            height="200px"
+            height={`${dimensions.height - 80}px`}
             extensions={[StreamLanguage.define(cypher)]}
             onChange={(value) => {
               setInnerText(value);
             }}
           />
+          <div
+            onMouseDown={handleResizeMouseDown}
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              cursor: 'sw-resize',
+              padding: '5px',
+              zIndex: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <BsArrowsAngleExpand style={{fontSize: '14px', color: '#888' }} />
+          </div>
         </div>
       )}
     </>

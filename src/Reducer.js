@@ -162,6 +162,37 @@ const Reducer = (state, action) => {
         nodes: cleanedNodes,
       };
     }
+    case 'DELETE_PREDICATE_LINK': {
+      const linkToDelete = action.payload;
+      const newPredicateLinks = state.predicateLinks.filter(link => 
+        !(link.from.nodeId === linkToDelete.from.nodeId && 
+          link.from.attr === linkToDelete.from.attr && 
+          link.to.nodeId === linkToDelete.to.nodeId && 
+          link.to.attr === linkToDelete.to.attr)
+      );
+      const cleanedNodes = cleanupJoins(state.nodes, newPredicateLinks);
+      return {
+        ...state,
+        predicateLinks: newPredicateLinks,
+        nodes: cleanedNodes
+      };
+    }
+    case 'UPDATE_PREDICATE_LINK': {
+      const { oldLink, newLink } = action.payload;
+      const newPredicateLinks = state.predicateLinks.map(link => {
+        if (link.from.nodeId === oldLink.from.nodeId && 
+            link.from.attr === oldLink.from.attr && 
+            link.to.nodeId === oldLink.to.nodeId && 
+            link.to.attr === oldLink.to.attr) {
+          return newLink;
+        }
+        return link;
+      });
+      return {
+        ...state,
+        predicateLinks: newPredicateLinks
+      };
+    }
     default:
       return state;
   }

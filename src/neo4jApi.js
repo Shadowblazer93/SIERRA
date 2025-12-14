@@ -240,7 +240,11 @@ const convertToQuery = (state) => {
       const fromNode = state.nodes.find(n => n.id === link.from.nodeId);
       const toNode = state.nodes.find(n => n.id === link.to.nodeId);
       if (fromNode && toNode && fromNode.data.rep && toNode.data.rep) {
-        allPredsArr.push(`${fromNode.data.rep}.${link.from.attr} = ${toNode.data.rep}.${link.to.attr}`);
+        let op = '=';
+        if (link.joinType === 'Theta Join') {
+          op = link.operator || '=';
+        }
+        allPredsArr.push(`${fromNode.data.rep}.${link.from.attr} ${op} ${toNode.data.rep}.${link.to.attr}`);
       }
     });
   }

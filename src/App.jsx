@@ -10,6 +10,7 @@ import SearchResults from './components/SearchResults';
 import { Context } from './Store';
 import CustomEdge from './components/CustomEdge';
 import PredicateLinkEdge from './components/PredicateLinkEdge';
+import PredicateLinkModal from './components/PredicateLinkModal';
 import ConfirmationAlert from './components/ConfirmationAlert';
 import {Button, Spin, Select} from 'antd';
 import {InfoCircleOutlined, CopyOutlined, LoadingOutlined} from '@ant-design/icons'
@@ -28,6 +29,8 @@ function App() {
   const [showResults, setShowResults] = useState(false);
   const [searchResult, setSearchResult] = useState([]);
   const [toastInfo, setToastInfo] = useState({ show: false, msg: '', confirm: function () {} });
+  const [joinModalVisible, setJoinModalVisible] = useState(false);
+  const [selectedLink, setSelectedLink] = useState(null);
   const [cypherQuery, setCypherQuery] = useState('');
   const [databaseSource, setDatabaseSource] = useState('northwind')
 
@@ -153,6 +156,34 @@ function App() {
     })
   }
 
+  const handleLinkClick = (event, id) => {
+    const idx = parseInt(id.split('-')[2]);
+    const link = state.predicateLinks[idx];
+    setSelectedLink(link);
+    setJoinModalVisible(true);
+  };
+
+  const handleDeleteLink = () => {
+    if (selectedLink) {
+      dispatch({
+        type: 'DELETE_PREDICATE_LINK',
+        payload: selectedLink
+      });
+      setJoinModalVisible(false);
+      setSelectedLink(null);
+    }
+  };
+
+  const handleUpdateLink = (newLink) => {
+    if (selectedLink) {
+      dispatch({
+        type: 'UPDATE_PREDICATE_LINK',
+        payload: { oldLink: selectedLink, newLink }
+      });
+      setSelectedLink(newLink);
+    }
+  };
+
   const predicateLinkElements = state.predicateLinks.length > 0
     ? state.predicateLinks.map((link, idx) => ({
         id: `predicate-link-${idx}`,
@@ -164,6 +195,7 @@ function App() {
         data: {
           fromAttr: link.from.attr,
           toAttr: link.to.attr,
+          onLinkClick: handleLinkClick
         }
       }))
     : [];
@@ -171,7 +203,7 @@ function App() {
   const renderContent = () => {
     if(pageStatus  === "LOADING") {
       return (
-        <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', backgroundImage: 'radial-gradient(circle, rgba(0,0,0,0.08) 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
+        <div className="loading-screen">
           <div className="spinner-layer" aria-hidden>
             <LoadingOutlined className="spin spin-1" />
             <LoadingOutlined className="spin spin-2" />
@@ -305,6 +337,14 @@ function App() {
               attr={toastInfo.attr ? toastInfo.attr : null}
             />
           ) : null}
+
+          <PredicateLinkModal
+            visible={joinModalVisible}
+            onClose={() => setJoinModalVisible(false)}
+            link={selectedLink}
+            onDelete={handleDeleteLink}
+            onUpdate={handleUpdateLink}
+          />
 
           {showResults ? <SearchResults result={searchResult.result} query={searchResult.query} hide={() => setShowResults(false)} /> : null}
         </>

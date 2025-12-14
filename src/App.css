@@ -141,3 +141,27 @@ td {
   from { transform: translate(-50%, -50%) rotate(0deg); }
   to   { transform: translate(-50%, -50%) rotate(-360deg); }
 }
+
+.loading-screen {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: #f8f9fa;
+  background-image:
+    linear-gradient(to right, rgba(139, 139, 139, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(139, 139, 139, 0.08) 1px, transparent 1px);
+  background-size: 70px 70px;
+  animation: pan-grid 20s linear infinite;
+}
+
+@keyframes pan-grid {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: -1000px -1000px;
+  }
+}

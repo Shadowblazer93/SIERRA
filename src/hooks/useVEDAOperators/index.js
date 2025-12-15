@@ -72,6 +72,9 @@ const useVEDAOperators = () => {
       let newNodes = [...graph.nodes]
       const nodeTBC = newNodes.find((el) => el.id === payload.id)
       if (nodeTBC) {
+        if (!(nodeTBC instanceof Circle)) {
+           Object.setPrototypeOf(nodeTBC, Circle.prototype);
+        }
         nodeTBC.bold()
         return {
           ...graph,
@@ -181,9 +184,17 @@ const useVEDAOperators = () => {
       const nodeTBC = newNodes.find((el) => el.id === parent)
 
       if(nodeTBC) { //* parent is a node
+        // Restore prototype if lost
+        if (!(nodeTBC instanceof Circle)) {
+           Object.setPrototypeOf(nodeTBC, Circle.prototype);
+        }
+
         const preds = nodeTBC.data.predicates
         if (attr in preds) {
           //* already have this predicate, joining a new one
+          if (!(preds[attr] instanceof Circle)) {
+             Object.setPrototypeOf(preds[attr], Circle.prototype);
+          }
           preds[attr].join(predCircle)
         } else {
           nodeTBC.join(predCircle)
@@ -249,6 +260,9 @@ const useVEDAOperators = () => {
       let newNodes = [...graph.nodes]
       const nodeTBC = newNodes.find((el) => el.id === parent)
       if(nodeTBC) { //* parent is a node
+        if (!(nodeTBC instanceof Circle)) {
+           Object.setPrototypeOf(nodeTBC, Circle.prototype);
+        }
         if(deleteAll) {
           //* remove all circles from predicate list
           nodeTBC.detach(attr)
@@ -256,6 +270,9 @@ const useVEDAOperators = () => {
           //* remove one circle from predicate list
           const preds = nodeTBC.data.predicates
           if (attr in nodeTBC.data.predicates) {
+            if (!(preds[attr] instanceof Circle)) {
+               Object.setPrototypeOf(preds[attr], Circle.prototype);
+            }
             preds[attr].detach(index)
           }
         }
@@ -267,6 +284,10 @@ const useVEDAOperators = () => {
       } else { //* parent is an edge
         let newEdges = [...graph.edges]
         const edgeTBC = newEdges.find((el) => el.id === parent)
+
+        if (edgeTBC && !(edgeTBC instanceof Arrow)) {
+             Object.setPrototypeOf(edgeTBC, Arrow.prototype);
+        }
 
         if(deleteAll) {
           //* remove all circles from predicate list

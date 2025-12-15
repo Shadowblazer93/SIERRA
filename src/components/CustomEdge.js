@@ -553,6 +553,7 @@ function CustomEdge({
         updatePredicate={updatePredicate}
         deletePredicate={deletePredicate}
         propData={propData}
+        onOpenCardinalityModal={() => setCardinalityModalVisible(true)}
       />
       <CardinalityPropsModal
         visible={cardinalityModalVisible}

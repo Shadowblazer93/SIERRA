@@ -24,6 +24,11 @@ function Node(props) {
   const [hoveredPredicate, setHoveredPredicate] = useState(null);
   const predicates = props.data.predicates ?? {};
 
+  const dnfRows = (props.data.dnf || []).filter(r => r.predicates && r.predicates.length > 0);
+  const hasPredicates = Object.keys(predicates).length > 0;
+  const hasDNF = dnfRows.length > 0;
+  const displayRadius = (hasDNF && !hasPredicates) ? props.data.radius + 15 : props.data.radius;
+
   useEffect(async () => {
     const propValues = await api.fetchPropertyValues(props.data.label);
     setPropData(propValues);
@@ -147,6 +152,16 @@ function Node(props) {
     _internalDispatchGraph(graph)
   };
 
+  const deleteNode = () => {
+    const graph = VA.delete(state, "NODE", {
+      id: props.id,
+      label: props.data.label,
+      el: { id: props.id } // Pass the element object expected by removeElements
+    })
+    _internalDispatchGraph(graph)
+    setShowDetails(false)
+  }
+
   const preds = () => {
     switch(state.predDisplayStatus) {
       case "FULL" :
@@ -169,7 +184,7 @@ function Node(props) {
             <PredicateCountBubble
               node={props.data.label}
               predicates={predicates}
-              nodeRad={props.data.radius}
+              nodeRad={displayRadius}
             />
           )
         } else {
@@ -181,7 +196,7 @@ function Node(props) {
     }
   }
   return (
-    <div style={{ position: 'relative', width: `${props.data.radius * 2}px`, height: `${props.data.radius * 2}px` }}>
+    <div style={{ position: 'relative', width: `${displayRadius * 2}px`, height: `${displayRadius * 2}px` }}>
       {/* Node */}
       <div
         id={'node-' + props.data.label}
@@ -195,8 +210,8 @@ function Node(props) {
         }}
         style={{
           background: props.data.color,
-          height: `${props.data.radius * 2}px`,
-          width: `${props.data.radius * 2}px`,
+          height: `${displayRadius * 2}px`,
+          width: `${displayRadius * 2}px`,
           border: props.data.isBold ? '1px solid #2F2F2F' : '',
           position: 'absolute',
           left: 0,
@@ -260,9 +275,9 @@ function Node(props) {
         const circle = predicates[attr];
         const angleOffset = -Math.PI/8;
         const angle = angleOffset + (index / Object.keys(predicates).length) * 2 * Math.PI;
-        const r = props.data.radius
-        const x = props.data.radius + r * Math.cos(angle) - 11;
-        const y = props.data.radius + r * Math.sin(angle) - 11;
+        const r = displayRadius
+        const x = displayRadius + r * Math.cos(angle) - 11;
+        const y = displayRadius + r * Math.sin(angle) - 11;
         const isHovered = hoveredPredicate === attr;
         const isLinking = state.linkingPredicate &&
           state.linkingPredicate.nodeId === props.id &&
@@ -352,6 +367,80 @@ function Node(props) {
         );
       })}
 
+      {/* DNF Bubbles (Inside Node) */}
+      {state.predDisplayStatus === "FULL" && dnfRows.map((row, i, arr) => {
+        const total = arr.length;
+        const bubbleSize = 17;
+        const innerRadius = displayRadius - 16;
+        let x, y;
+
+        if (total >= 13) {
+          // Regular circle mapping (360 degrees)
+          const angleOffset = -Math.PI / 2; // Start from top
+          const angle = angleOffset + (i / total) * 2 * Math.PI;
+          x = displayRadius + innerRadius * Math.cos(angle) - (bubbleSize / 2);
+          y = displayRadius + innerRadius * Math.sin(angle) - (bubbleSize / 2);
+        } else {
+          // Split layout (Bottom 4, then Top)
+          const maxBottom = 4;
+          const isBottom = i < maxBottom;
+          
+          const rowSize = isBottom 
+            ? Math.min(total, maxBottom) 
+            : total - maxBottom;
+            
+          const indexInRow = isBottom ? i : i - maxBottom;
+          const gap = 3;
+          
+          // Calculate angles
+          // Bottom center : Math.PI/2, Top center : -Math.PI/2
+          const centerAngle = isBottom ? Math.PI / 2 : -Math.PI / 2;
+          
+          const angleStep = (bubbleSize + gap) / innerRadius;
+          
+          const startAngle = centerAngle - ((rowSize - 1) * angleStep) / 2;
+          const angle = startAngle + indexInRow * angleStep;
+
+          x = displayRadius + innerRadius * Math.cos(angle) - (bubbleSize / 2);
+          y = displayRadius + innerRadius * Math.sin(angle) - (bubbleSize / 2);
+        }
+        
+        const tooltipContent = row.predicates.map(p => {
+           const val = (p.val && typeof p.val === 'object' && 'low' in p.val) ? p.val.low : p.val;
+           return `${p.attr} ${p.op} ${val}`;
+        }).join(' AND ');
+
+        return (
+          <Tooltip key={row.id} title={tooltipContent} placement="top">
+            <div
+              onClick={(e) => { e.stopPropagation(); setShowDetails(true); }}
+              style={{
+                position: 'absolute',
+                left: x,
+                top: y,
+                width: `${bubbleSize}px`,
+                height: `${bubbleSize}px`,
+                background: 'white',
+                borderRadius: '50%',
+                border: '1px solid black',
+                boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
+                zIndex: 20,
+                cursor: 'pointer',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                color: '#555',
+                fontSize: '9px',
+                fontWeight: '700',
+                letterSpacing: '-0.5px'
+              }}
+            >
+              OR
+            </div>
+          </Tooltip>
+        );
+      })}
+
       {/* Modal */}
       <NodePredicateModal
         node={props.data.label}
@@ -359,6 +448,7 @@ function Node(props) {
         targets={props.data.possibleTargets}
         attributes={props.data.attributes}
         predicates={predicates}
+        dnf={props.data.dnf}
         visible={state.modalVisible === props.id}
         addPredicate={addPredicate}
         deletePredicate={deletePredicate}
@@ -368,6 +458,7 @@ function Node(props) {
         propData={propData}
         currPos={[props.xPos, props.yPos]}
         onClose={() => { setShowDetails(false); }}
+        onDeleteNode={deleteNode}
       />
     </div>
   );

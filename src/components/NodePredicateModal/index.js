@@ -1,5 +1,5 @@
-import { Drawer, Button, Divider, Typography } from 'antd';
-import {ArrowLeftOutlined} from '@ant-design/icons'
+import { Drawer, Button, Divider, Typography, Tooltip } from 'antd';
+import {ArrowLeftOutlined, DeleteOutlined} from '@ant-design/icons'
 import React, {useState, useContext} from 'react';
 import { addEdge } from 'react-flow-renderer';
 import { PRED_COLOR_V2 } from '../../constants';
@@ -7,6 +7,7 @@ import { Context } from '../../Store';
 import { PredicateDraw, PredicateCheckBox, SelectTag } from '../common';
 import { getNodeId } from '../../utils/getNodeId';
 import useVisualActions from '../../hooks/useVisualActions';
+import DNFBuilder from './DNFBuilder';
 
 const { Title } = Typography
 
@@ -18,6 +19,7 @@ const NodePredicateModal = ({
   targets,
   attributes,
   predicates,
+  dnf,
   addPredicate,
   deletePredicate,
   updatePredicate,
@@ -25,6 +27,7 @@ const NodePredicateModal = ({
   isJoin,
   setIsJoin,
   propData,
+  onDeleteNode
 }) => {
   const VA = useVisualActions()
   const [childrenDrawer, setChildDrawer] = useState({});
@@ -42,6 +45,13 @@ const NodePredicateModal = ({
       ...childrenDrawer,
       [attr]: false
     })
+  };
+
+  const handleSaveDNF = (newDNF) => {
+    dispatch({
+      type: 'MODIFY_NODE_DATA',
+      payload: { node: nodeId, prop: 'dnf', newVal: newDNF },
+    });
   };
 
   //* Add Target node (new)
@@ -76,7 +86,19 @@ const NodePredicateModal = ({
 
   return (
       <Drawer
-        title={<Title style={{marginBottom: 0}}level={3}>{node}</Title>}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Title style={{marginBottom: 0}} level={3}>{node}</Title>
+            <Tooltip title="Delete Node">
+              <Button 
+                type="text" 
+                danger 
+                icon={<DeleteOutlined />} 
+                onClick={onDeleteNode}
+              />
+            </Tooltip>
+          </div>
+        }
         placement="left"
         closeIcon={<ArrowLeftOutlined/>}
         maskClosable={false}
@@ -148,21 +170,31 @@ const NodePredicateModal = ({
           </Button>
         </div>
 
+        <Divider orientation="left">DNF Query Builder</Divider>
+        <DNFBuilder 
+            attributes={attributes} 
+            propData={propData} 
+            initialData={dnf} 
+            onSave={handleSaveDNF} 
+        />
+
         <Divider orientation="left">Possible Targets</Divider>
-        {
-          targets.map((target, i) => {
-            return (
-              <Button
-                style={{marginRight: 8}}
-                key={`${i}`}
-                onClick={() => {
-                  addTarget(target)
-                }} type="text">
-                {target}
-              </Button>
-            )
-          })
-        }
+        <div style={{padding: '0px 15px 10px'}}>
+          {
+            targets.map((target, i) => {
+              return (
+                <Button
+                  style={{marginRight: 8, background: '#d7f0ffee', borderRadius: 10}}
+                  key={`${i}`}
+                  onClick={() => {
+                    addTarget(target)
+                  }} type="text">
+                  {target}
+                </Button>
+              )
+            })
+          }
+        </div>
 
       </Drawer>
   );

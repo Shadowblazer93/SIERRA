@@ -137,9 +137,9 @@ const convertToQuery = (state) => {
     if (!curNode.data.connected) {
       loneNodeQueries.push(`(${curNode.data.rep}:${curNode.data.label})`);
     }
-    let nodePredsArr = ''
+    let nodePredsArr = []
     if (curNode.data.predicates) {
-      nodePredsArr = Object.keys(curNode.data.predicates).map(function (attr) {
+      const standardPreds = Object.keys(curNode.data.predicates).map(function (attr) {
         const preds = curNode.data.predicates[attr].data;
         var predsStringsArr = preds
           .filter(pred => pred[1] !== '' && pred[1] !== undefined && pred[1] !== null)
@@ -148,11 +148,28 @@ const convertToQuery = (state) => {
             const predVal = typeof pred[1] === 'string' ? `'${pred[1]}'` : pred[1];
             return `${curNode.data.rep}.${attr} ${Constants.OPERATORS[op]} ${predVal}`;
           });
-        var predsQueryString = predsStringsArr.join(' AND ');
-
-        return predsQueryString;
+        return predsStringsArr.join(' AND ');
       });
+      nodePredsArr = nodePredsArr.concat(standardPreds);
     }
+
+    // DNF Predicates
+    if (curNode.data.dnf && curNode.data.dnf.length > 0) {
+        const dnfGroups = curNode.data.dnf.map(row => {
+            const rowPreds = row.predicates
+                .filter(p => p.attr && p.val !== undefined && p.val !== null && p.val !== '')
+                .map(p => {
+                    const val = typeof p.val === 'string' ? `'${p.val}'` : p.val;
+                    return `${curNode.data.rep}.${p.attr} ${Constants.OPERATORS[p.op] || p.op} ${val}`;
+                });
+            return rowPreds.length > 0 ? `(${rowPreds.join(' AND ')})` : null;
+        }).filter(Boolean);
+
+        if (dnfGroups.length > 0) {
+            nodePredsArr.push(`(${dnfGroups.join(' OR ')})`);
+        }
+    }
+
     allPredsArr = allPredsArr.concat(nodePredsArr);
   }
   var allRsQueries = [];
@@ -164,6 +181,10 @@ const convertToQuery = (state) => {
   for (var i = 0; i < state.edges.length; i++) {
     var srcNode = state.nodes.find((el) => el.id === state.edges[i].source);
     var destNode = state.nodes.find((el) => el.id === state.edges[i].target);
+
+    // If either node is missing (e.g. deleted), skip this edge
+    if (!srcNode || !destNode) continue;
+
     var qString;
 
     // Check for hops (cardinality)

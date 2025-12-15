@@ -24,7 +24,8 @@ const EdgeModal = ({
   updatePredicate,
   deletePredicate,
   propData,
-  visible
+  visible,
+  onOpenCardinalityModal
 }) => {
   //..
   const [state, dispatch] = useContext(Context);
@@ -85,7 +86,7 @@ const EdgeModal = ({
                   }}
                   labelInValue
                   value={{value: rs}}
-                  style={{width: '80%'}}
+                  style={{width: '100%'}}
                   // size="small"
                 >
                   <Option value="">None</Option>
@@ -97,6 +98,12 @@ const EdgeModal = ({
                   }
 
                 </Select>
+                <Button 
+                  onClick={onOpenCardinalityModal} 
+                  style={{marginTop: 10, width: '100%'}}
+                >
+                  Edit Relationship Properties
+                </Button>
               </div>
             </>
           )}

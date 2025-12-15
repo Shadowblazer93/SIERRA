@@ -176,9 +176,9 @@ const EdgeModal = ({
             <InputNumber
               min={0}
               value={cardinality.min}
-              disabled={cardinality.max !== 1} // lock if max is set
+              disabled={cardOp === '='}
               onChange={(val) => {
-                const newCard = { min: val, max: 1 };
+                const newCard = { ...cardinality, min: val };
                 setCardinality(newCard);
                 updateEdgeCardinality({ ...newCard, op: cardOp });
               }}
@@ -188,9 +188,9 @@ const EdgeModal = ({
             <InputNumber
               min={0}
               value={cardinality.max}
-              disabled={cardinality.min !== 1} // lock if min is set
+              // disabled={cardinality.min !== 1} // lock if min is set
               onChange={(val) => {
-                const newCard = { min: 1, max: val };
+                const newCard = { ...cardinality, max: val };
                 setCardinality(newCard);
                 updateEdgeCardinality({ ...newCard, op: cardOp });
               }}
@@ -201,9 +201,7 @@ const EdgeModal = ({
               updateEdgeCardinality({ ...cardinality, op: val });
             }} style={{ width: 80 }}>
               <Option value="=">{'='}</Option>
-              <Option value=">">{'>'}</Option>
-              <Option value="<">{'<'}</Option>
-              <Option value="<>">{'!='}</Option>
+              <Option value="range">{'range'}</Option>
             </Select>
             <Button
               style={{marginLeft: 16}}

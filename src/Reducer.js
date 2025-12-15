@@ -47,7 +47,10 @@ const Reducer = (state, action) => {
         ...state,
         entities: action.payload.entities,
         neighbours: action.payload.neighbours,
-        props: action.payload.props
+        props: action.payload.props,
+        nodes: [],
+        edges: [],
+        predicateLinks: []
       };
     case 'SET_GRAPH':
       console.log('SETTING GRAPH');

@@ -156,9 +156,7 @@ const convertToQuery = (state) => {
     allPredsArr = allPredsArr.concat(nodePredsArr);
   }
   var allRsQueries = [];
-  var cardinalityWithQueries = [];
-  var cardinalityWhereQueries = [];
-  var blockedReturnNodes = [];
+  var optionalRsQueries = [];
   var joinNodes = state.nodes.filter(n => n.data.isJoin);
   console.log("HHH",state.predicateLinks)
   
@@ -168,36 +166,36 @@ const convertToQuery = (state) => {
     var destNode = state.nodes.find((el) => el.id === state.edges[i].target);
     var qString;
 
-    // cardinality
-    if (state.edges[i].data.cardinality!=undefined) {
-      console.log("HOOYAH",srcNode)
-      const cardinality = state.edges[i].data.cardinality;
-      var min = cardinality.min;
-      var max = cardinality.max;
-      var op = cardinality.op ?? '=';
+    // Check for hops (cardinality)
+    let hops = '';
+    let isVarLength = false;
+    if (state.edges[i].data.cardinality) {
+        const {min, max} = state.edges[i].data.cardinality;
+        const op = state.edges[i].data.cardinality.op || '=';
 
-      if (!(min==1 && max==1)) {
-        if (min!=1) {
-          cardinalityWithQueries.push(`${destNode.data.rep}`)
-          cardinalityWithQueries.push(`count(${srcNode.data.rep}) AS relCount`)
-          cardinalityWhereQueries.push(`relCount ${op} ${min}`)
-          blockedReturnNodes.push(srcNode.data.rep);
+        if (op === '=') {
+             if (max !== 1) {
+                 hops = `*${max}`;
+                 isVarLength = true;
+             }
         } else {
-          cardinalityWithQueries.push(`${srcNode.data.rep}`)
-          cardinalityWithQueries.push(`count(${destNode.data.rep}) AS relCount`)
-          cardinalityWhereQueries.push(`relCount ${op} ${min}`)
-          blockedReturnNodes.push(destNode.data.rep);
+            // range
+            if (min !== 1 || max !== 1) {
+                hops = `*${min}..${max}`;
+                isVarLength = true;
+            }
         }
-      }
     }
+
     // if directed
     if (state.edges[i].arrowHeadType !== '') {
       var rsLabel = 'r' + (i + 10).toString(36);
       // if rs type is specified
       if (state.edges[i].data.rs !== '') {
-        qString = `(${srcNode.data.rep}:${srcNode.data.label})-[${rsLabel}:${state.edges[i].data.rs}]->`+
+        qString = `(${srcNode.data.rep}:${srcNode.data.label})-[${rsLabel}:${state.edges[i].data.rs}${hops}]->`+
         `(${destNode.data.rep}:${destNode.data.label})`;
         var currEdge = state.edges[i];
+        var localPreds = [];
         // process edge predicates
         if (Object.keys(currEdge.data.predicates).length > 0){
           var edgePredsArr = Object.keys(currEdge.data.predicates).map(function (attr) {
@@ -207,31 +205,68 @@ const convertToQuery = (state) => {
               .map(function (pred) {
                 const op = pred[0];
                 const predVal = typeof pred[1] === 'string' ? `'${pred[1]}'` : pred[1];
+                if (isVarLength) {
+                    return `ALL(rel in ${rsLabel} WHERE rel.${attr} ${Constants.OPERATORS[op]} ${predVal})`;
+                }
                 return `${rsLabel}.${attr} ${Constants.OPERATORS[op]} ${predVal}`;
               });
             var predsQueryString = predsStringsArr.join(' AND ');
             return predsQueryString;
           });
-          allPredsArr = allPredsArr.concat(edgePredsArr);
+          if (currEdge.data.isOptional) {
+            localPreds = localPreds.concat(edgePredsArr);
+          } else {
+            allPredsArr = allPredsArr.concat(edgePredsArr);
+          }
         }
         if (Array.isArray(currEdge.data.cardinalityProps) && currEdge.data.cardinalityProps.length > 0) {
           currEdge.data.cardinalityProps.forEach(prop => {
             if (prop.key && prop.value !== undefined && prop.value !== null && prop.value !== '') {
               const val = typeof prop.value === 'string' ? `'${prop.value}'` : prop.value;
-              allPredsArr.push(`${rsLabel}.${prop.key} = ${val}`);
+              const op = prop.operator || '=';
+              let pred;
+              if (isVarLength) {
+                  pred = `ALL(rel in ${rsLabel} WHERE rel.${prop.key} ${op} ${val})`;
+              } else {
+                  pred = `${rsLabel}.${prop.key} ${op} ${val}`;
+              }
+              if (currEdge.data.isOptional) {
+                localPreds.push(pred);
+              } else {
+                allPredsArr.push(pred);
+              }
             }
           });
         }
         // ----------------------------------------------------
+        if (currEdge.data.isOptional) {
+          localPreds = localPreds.filter(Boolean);
+          if (localPreds.length > 0) {
+            qString += ` WHERE ${localPreds.join(' AND ')}`;
+          }
+        }
       } else {
-        qString = `(${srcNode.data.rep}:${srcNode.data.label})-->(${destNode.data.rep}:${destNode.data.label})`;
+        if (isVarLength) {
+             qString = `(${srcNode.data.rep}:${srcNode.data.label})-[${hops}]->(${destNode.data.rep}:${destNode.data.label})`;
+        } else {
+             qString = `(${srcNode.data.rep}:${srcNode.data.label})-->(${destNode.data.rep}:${destNode.data.label})`;
+        }
       }
     }
     // if undirected
     else {
-      qString = `(${srcNode.data.rep}:${srcNode.data.label})--(${destNode.data.rep}:${destNode.data.label})`;
+      if (isVarLength) {
+          qString = `(${srcNode.data.rep}:${srcNode.data.label})-[${hops}]-(${destNode.data.rep}:${destNode.data.label})`;
+      } else {
+          qString = `(${srcNode.data.rep}:${srcNode.data.label})--(${destNode.data.rep}:${destNode.data.label})`;
+      }
     }
-    allRsQueries.push(qString);
+    
+    if (state.edges[i].data.isOptional) {
+      optionalRsQueries.push(qString);
+    } else {
+      allRsQueries.push(qString);
+    }
   }
 
   if (state.predicateLinks && state.predicateLinks.length > 0) {
@@ -264,43 +299,22 @@ const convertToQuery = (state) => {
   }
 
   var allRsQueriesString = allRsQueries.join(', ');
-  var allCardinalityWithString = cardinalityWithQueries.join(', ')
-  var allCardinalityWhereString = cardinalityWhereQueries.join(', ')
+  var optionalRsQueriesString = optionalRsQueries.length > 0 ? '\n' + optionalRsQueries.map(q => `OPTIONAL MATCH ${q}`).join('\n') : '';
 
   if (joinNodes.length > 0) {
     var jSymbol = joinNodes[0].data.rep;
-    return `MATCH ${loneQueryString}${allRsQueriesString}
+    return `MATCH ${loneQueryString}${allRsQueriesString}${optionalRsQueriesString}
 ${allPredsQueryString}
 OPTIONAL MATCH (${jSymbol})--(o)
 RETURN ${jSymbol}, COLLECT(o) AS others`;
   }
 
-  if (allCardinalityWhereString.length !== 0 || allCardinalityWithString.length !== 0) {
-    if (blockedReturnNodes.length > 0) {
-      returnVars = returnVars.filter(v => !blockedReturnNodes.includes(v));
-    }
-
-    // All predicates (node, edge, relationship properties) go in the first WHERE
-    let whereClause = allPredsArr.length > 0 ? `WHERE ${allPredsArr.join(' AND ')}` : '';
-
-    // Cardinality constraints go in the second WHERE after WITH
-    let withClause = allCardinalityWithString.length > 0 ? `WITH ${allCardinalityWithString}` : '';
-    let cardinalityWhereClause = allCardinalityWhereString.length > 0 ? `WHERE ${allCardinalityWhereString}` : '';
-    let newLineWhereClause = Boolean(whereClause) ?`
-` : ``;
-
-    return `MATCH ${loneQueryString}${allRsQueriesString}${newLineWhereClause}${whereClause}
-${withClause}
-${cardinalityWhereClause}
-RETURN ${returnVars.join(', ')}`
-  }
-
   return allPredsQueryString ?
-    `MATCH ${loneQueryString}${allRsQueriesString}
+    `MATCH ${loneQueryString}${allRsQueriesString}${optionalRsQueriesString}
 ${allPredsQueryString}
 RETURN ${returnVars.join(', ')}` :
 
-    `MATCH ${loneQueryString}${allRsQueriesString}
+    `MATCH ${loneQueryString}${allRsQueriesString}${optionalRsQueriesString}
 RETURN ${returnVars.join(', ')}`
 
 

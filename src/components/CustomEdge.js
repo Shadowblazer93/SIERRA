@@ -275,6 +275,7 @@ function CustomEdge({
   const midX = (sourceX + targetX) / 2;
   const midY = (sourceY + targetY) / 2 + 10;
 
+  const isRange = cardinality?.op === 'range';
   const baseWidth = 60;
   const bubbleSpacing = 22;
   const numBubbles = Array.isArray(cardinalityProps) ? cardinalityProps.length : 0;
@@ -321,7 +322,7 @@ function CustomEdge({
           {rs}
         </textPath>
       </text>
-      {cardinality && !(cardinality.min === 1 && cardinality.max === 1) && (
+      {cardinality && !(cardinality.min === 1 && cardinality.max === 1 && numBubbles === 0) && (
         <>
           {/* Cardinality box with its own tooltip and click */}
           <Tooltip
@@ -329,7 +330,7 @@ function CustomEdge({
               <>
                 <div style={{fontWeight: 'bold'}}>Cardinality: {cardinality.min} to {cardinality.max}</div>
                 <div style={{marginTop: 4, fontSize: 12, color: '#ffffffff'}}>
-                  For every {cardinality.min} relationship(s) of <b>{data.source}</b>, there is {cardinality.max} relationships of <b>{data.destination}</b>.
+                  There are {cardinality.min} to {cardinality.max} hops between <b>{data.source}</b> and <b>{data.destination}</b>.
                 </div>
               </>
             }
@@ -376,6 +377,8 @@ function CustomEdge({
                   width: '100%',
                   pointerEvents: 'none'
                 }}>
+                  {isRange && (
+                  <>
                   <div style={{ display: 'flex', alignItems: 'center', pointerEvents: 'auto' }}>
                   <input
                   type="text"
@@ -396,7 +399,7 @@ function CustomEdge({
                   marginRight: 1,
                   outline: 'none',
                   fontWeight: 'bold',
-                  color: cardinality.max>1 ? '#666' : '#333',
+                  color: (isRange && parseInt(cardinality.min) > parseInt(cardinality.max)) ? '#bb0b0bff' : (cardinality.max>1 ? '#666' : '#333'),
                   transition: isHovered ? 'all 0.2s ease' : 'none' 
                   }}
                   />
@@ -421,7 +424,9 @@ function CustomEdge({
                       />
                     </div>
                   </div>
-                  <span style={{ fontSize: '10px', margin: '0 2px', fontWeight: 'bold', color: '#333' }}>→</span>
+                  <span style={{ fontSize: '10px', margin: '0 2px', fontWeight: 'bold', color: '#333' }}>..</span>
+                  </>
+                  )}
                   <div style={{ display: 'flex', alignItems: 'center', pointerEvents: 'auto' }}>
                     <input
                       type="text"
@@ -442,7 +447,7 @@ function CustomEdge({
                         marginRight: 1,
                         outline: 'none',
                         fontWeight: 'bold',
-                        color: cardinality.min>1 ? '#666' : '#333',
+                        color: (isRange && parseInt(cardinality.min) > parseInt(cardinality.max)) ? '#bb0b0bff' : (cardinality.min>1 ? '#666' : '#333'),
                         transition: isHovered ? 'all 0.2s ease' : 'none' 
                       }}
                     />
@@ -556,6 +561,7 @@ function CustomEdge({
         onSave={updateEdgeCardinalityProps}
         cardinality={cardinality}
         onChangeCardinality={updateEdgeCardinality}
+        propData={propData}
       />
     </>
   );

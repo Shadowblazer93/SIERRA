@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Drawer, Input, Button, Space, Typography, Divider, InputNumber, Select } from 'antd';
 import {ArrowLeftOutlined} from '@ant-design/icons'
-import { COLORS_HEX } from '../constants';
+import { COLORS_HEX, OPERATORS } from '../constants';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -12,20 +12,41 @@ function getRandomColor() {
   return COLORS_HEX[idx];
 }
 
+function formatValue(val) {
+  if (val && typeof val === 'object' && 'low' in val && 'high' in val) {
+    return val.low.toString();
+  }
+  return val;
+}
+
 const CardinalityPropsModal = ({
   visible,
   onClose,
   cardinalityProps,
   onSave,
   cardinality = { min: 1, max: 1 },
-  onChangeCardinality
+  onChangeCardinality,
+  propData = []
 }) => {
   const [propsList, setPropsList] = useState(cardinalityProps || []);
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
+  const [newOperator, setNewOperator] = useState('=');
   const [newColor, setNewColor] = useState(getRandomColor());
   const [localCardinality, setLocalCardinality] = useState(cardinality);
   const [localOp, setLocalOp] = useState(cardinality?.op ?? '=');
+
+  const availableProperties = useMemo(() => {
+    return Array.from(new Set(propData.flatMap(obj => Object.keys(obj))));
+  }, [propData]);
+
+  const availableValues = useMemo(() => {
+    if (!newKey) return [];
+    const values = propData
+      .map(obj => formatValue(obj[newKey]))
+      .filter(val => val !== undefined && val !== null);
+    return Array.from(new Set(values));
+  }, [newKey, propData]);
 
   useEffect(() => {
     setPropsList(cardinalityProps || []);
@@ -46,9 +67,10 @@ const CardinalityPropsModal = ({
 
   const addProp = () => {
     if (!newKey) return;
-    setPropsList([...propsList, { key: newKey, value: newValue, color: newColor }]);
+    setPropsList([...propsList, { key: newKey, value: newValue, color: newColor, operator: newOperator }]);
     setNewKey('');
     setNewValue('');
+    setNewOperator('=');
     setNewColor(getRandomColor());
   };
 
@@ -57,13 +79,13 @@ const CardinalityPropsModal = ({
   };
 
   const handleMinChange = (val) => {
-    const newCard = { min: val ?? 1, max: 1 };
+    const newCard = { ...localCardinality, min: val ?? 1 };
     setLocalCardinality(newCard);
     if (typeof onChangeCardinality === 'function') onChangeCardinality({ ...newCard, op: localOp });
   };
 
   const handleMaxChange = (val) => {
-    const newCard = { min: 1, max: val ?? 1 };
+    const newCard = { ...localCardinality, max: val ?? 1 };
     setLocalCardinality(newCard);
     if (typeof onChangeCardinality === 'function') onChangeCardinality({ ...newCard, op: localOp });
   };
@@ -112,23 +134,20 @@ const CardinalityPropsModal = ({
           <InputNumber
             min={0}
             value={localCardinality?.min ?? 1}
-            disabled={localCardinality?.max !== 1}
+            disabled={localOp === '='}
             onChange={handleMinChange}
             style={{width: 80}}
           />
           to
           <InputNumber
-            min={0}
             value={localCardinality?.max ?? 1}
-            disabled={localCardinality?.min !== 1}
+            // disabled={localCardinality?.min !== 1}
             onChange={handleMaxChange}
             style={{width: 80}}
           />
           <Select value={localOp} onChange={handleOpChange} style={{ width: 80 }}>
             <Option value="=">{'='}</Option>
-            <Option value=">">{'>'}</Option>
-            <Option value="<">{'<'}</Option>
-            <Option value="<>">{'!='}</Option>
+            <Option value="range">{'range'}</Option>
           </Select>
           <Button
             style={{marginLeft: 8}}
@@ -146,26 +165,57 @@ const CardinalityPropsModal = ({
               width: 20, height: 20, borderRadius: '50%',
               background: prop.color || '#eee', border: '1px solid #333'
             }} />
-            <span><b>{prop.key}</b>: {prop.value}</span>
+            <span><b>{prop.key}</b> {prop.operator || '='} {formatValue(prop.value)}</span>
             <Button size="small" danger onClick={() => removeProp(idx)}>Remove</Button>
           </div>
         ))}
         <hr style={{ width: '100%', margin: '12px 0' }} />
         
+        <Title level={5} style={{ marginBottom: 0 }}>Available Properties</Title>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+          {availableProperties.length > 0 ? (
+            availableProperties.map(key => (
+              <Button 
+                key={key} 
+                size="small" 
+                onClick={() => { setNewKey(key); setNewValue(''); }}
+              >
+                {key}
+              </Button>
+            ))
+          ) : (
+            <span style={{ color: '#999' }}>No properties found in database.</span>
+          )}
+        </div>
+
         <Title level={5} style={{ marginBottom: 0 }}>Add New Property</Title>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Input
-            placeholder="Property Key"
-            value={newKey}
-            onChange={e => setNewKey(e.target.value)}
-            style={{ width: 120 }}
-            />
-            <Input
-            placeholder="Property Value"
-            value={newValue}
-            onChange={e => setNewValue(e.target.value)}
-            style={{ width: 120 }}
-            />
+            <Select
+              placeholder="Key"
+              value={newKey || undefined}
+              onChange={val => { setNewKey(val); setNewValue(''); }}
+              style={{ width: 120 }}
+              showSearch
+            >
+              {availableProperties.map(key => (
+                <Option key={key} value={key}>{key}</Option>
+              ))}
+            </Select>
+            <Select value={newOperator} onChange={setNewOperator} style={{ width: 60 }}>
+              {OPERATORS.map(op => <Option key={op} value={op}>{op}</Option>)}
+            </Select>
+            <Select
+              placeholder="Value"
+              value={newValue || undefined}
+              onChange={setNewValue}
+              style={{ width: 120 }}
+              showSearch
+              disabled={!newKey}
+            >
+              {availableValues.map((val, i) => (
+                <Option key={`${val}-${i}`} value={val}>{String(val)}</Option>
+              ))}
+            </Select>
             <Input
             type="color"
             value={newColor}

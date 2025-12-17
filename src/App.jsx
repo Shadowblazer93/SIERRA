@@ -252,11 +252,11 @@ function App() {
                   <Select.Option value="northwind">NorthWind</Select.Option>
                   <Select.Option value="fincen">Fincen</Select.Option>
                   <Select.Option value="twitter">Twitter</Select.Option>
-                  <Select.Option value="stackoverflow">StackOverFlow</Select.Option>
+                  {/* <Select.Option value="stackoverflow">StackOverFlow</Select.Option> */}
                   <Select.Option value="gameofthrones">GameOfThrones</Select.Option>
-                  <Select.Option value="neoflix">NeoFlix</Select.Option>
-                  <Select.Option value="wordnet">WordNet</Select.Option>
-                  <Select.Option value="slack">Slack</Select.Option>
+                  {/* <Select.Option value="neoflix">NeoFlix</Select.Option> */}
+                  {/* <Select.Option value="wordnet">WordNet</Select.Option> */}
+                  {/* <Select.Option value="slack">Slack</Select.Option> */}
                 </Select>
               </div>
               <NewNodeDrawButton addNode={addNode} />

@@ -12,7 +12,7 @@ if (!neo4jVersion.startsWith('4')) {
   database = null;
 }
 function createDriver() {
-  return neo4j.driver("neo4j+s://demo.neo4jlabs.com:7687",neo4j.auth.basic(user, password));
+  return neo4j.driver("bolt+s://demo.neo4jlabs.com:7687",neo4j.auth.basic(user, password));
 }
 async function setDatabase(db) {
   database = db && db.length ? db : process.env.NEO4J_DATABASE;
@@ -26,7 +26,7 @@ function getDatabase(db) {
   return database;
 }
 
-let driver = neo4j.driver("neo4j+s://demo.neo4jlabs.com:7687", neo4j.auth.basic(user, password));
+let driver = neo4j.driver("bolt+s://demo.neo4jlabs.com:7687", neo4j.auth.basic(user, password));
 
 // fetch all node entities and list of neighbours for each node entity
 async function setUp() {
@@ -52,7 +52,7 @@ async function setUp() {
 // get neighbours of a list of nodes
 async function getNeighbours(entities) {
   var finalResult = {};
-  entities.map(async (entity) => {
+  await Promise.all(entities.map(async (entity) => {
     var session = driver.session({ database: database });
     var neighbourObj = await session
       .readTransaction(
@@ -70,7 +70,7 @@ async function getNeighbours(entities) {
         return session.close();
       });
     Object.assign(finalResult, { [entity]: neighbourObj });
-  });
+  }));
 
   return finalResult;
 }
@@ -91,7 +91,7 @@ async function getProperties(entities) {
         result.records.forEach((record) => {
           merged = _.union(merged, record.get('keys(n)'));
         });
-        return { [result.records[0].get('labels(n)')]: merged };
+        return { [entity]: merged };
       })
       .finally(() => {
         return session.close();

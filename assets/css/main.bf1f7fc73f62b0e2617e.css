@@ -237,3 +237,48 @@ ul li::marker {
   padding: 12px 16px;
 }
 
+.join-graph-container {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  height: 300px;
+  width: 400px;
+  background-color: white;
+  box-shadow: rgb(0 0 0 / 6%) 0 0 0 1px, rgb(0 0 0 / 5%) 0 10px 10px -5px;
+  z-index: 20;
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.join-graph-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 8px;
+}
+
+.join-graph-content {
+  flex: 1;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* Simple Node Style */
+.simple-node {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  font-size: 14px;
+}
+

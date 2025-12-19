@@ -173,7 +173,6 @@ const convertToQuery = (state) => {
     allPredsArr = allPredsArr.concat(nodePredsArr);
   }
   var allRsQueries = [];
-  var optionalRsQueries = [];
   var joinNodes = state.nodes.filter(n => n.data.isJoin);
   console.log("HHH",state.predicateLinks)
   
@@ -186,13 +185,14 @@ const convertToQuery = (state) => {
     if (!srcNode || !destNode) continue;
 
     var qString;
+    var currEdge = state.edges[i];
 
     // Check for hops (cardinality)
     let hops = '';
     let isVarLength = false;
-    if (state.edges[i].data.cardinality) {
-        const {min, max} = state.edges[i].data.cardinality;
-        const op = state.edges[i].data.cardinality.op || '=';
+    if (currEdge.data.cardinality) {
+        const {min, max} = currEdge.data.cardinality;
+        const op = currEdge.data.cardinality.op || '=';
 
         if (op === '=') {
              if (max !== 1) {
@@ -209,14 +209,13 @@ const convertToQuery = (state) => {
     }
 
     // if directed
-    if (state.edges[i].arrowHeadType !== '') {
+    if (currEdge.arrowHeadType !== '') {
       var rsLabel = 'r' + (i + 10).toString(36);
       // if rs type is specified
-      if (state.edges[i].data.rs !== '') {
-        qString = `(${srcNode.data.rep}:${srcNode.data.label})-[${rsLabel}:${state.edges[i].data.rs}${hops}]->`+
+      if (currEdge.data.rs !== '') {
+        qString = `(${srcNode.data.rep}:${srcNode.data.label})-[${rsLabel}:${currEdge.data.rs}${hops}]->`+
         `(${destNode.data.rep}:${destNode.data.label})`;
-        var currEdge = state.edges[i];
-        var localPreds = [];
+        
         // process edge predicates
         if (Object.keys(currEdge.data.predicates).length > 0){
           var edgePredsArr = Object.keys(currEdge.data.predicates).map(function (attr) {
@@ -234,11 +233,7 @@ const convertToQuery = (state) => {
             var predsQueryString = predsStringsArr.join(' AND ');
             return predsQueryString;
           });
-          if (currEdge.data.isOptional) {
-            localPreds = localPreds.concat(edgePredsArr);
-          } else {
-            allPredsArr = allPredsArr.concat(edgePredsArr);
-          }
+          allPredsArr = allPredsArr.concat(edgePredsArr);
         }
         if (Array.isArray(currEdge.data.cardinalityProps) && currEdge.data.cardinalityProps.length > 0) {
           currEdge.data.cardinalityProps.forEach(prop => {
@@ -251,20 +246,9 @@ const convertToQuery = (state) => {
               } else {
                   pred = `${rsLabel}.${prop.key} ${op} ${val}`;
               }
-              if (currEdge.data.isOptional) {
-                localPreds.push(pred);
-              } else {
-                allPredsArr.push(pred);
-              }
+              allPredsArr.push(pred);
             }
           });
-        }
-        // ----------------------------------------------------
-        if (currEdge.data.isOptional) {
-          localPreds = localPreds.filter(Boolean);
-          if (localPreds.length > 0) {
-            qString += ` WHERE ${localPreds.join(' AND ')}`;
-          }
         }
       } else {
         if (isVarLength) {
@@ -283,11 +267,14 @@ const convertToQuery = (state) => {
       }
     }
     
-    if (state.edges[i].data.isOptional) {
-      optionalRsQueries.push(qString);
-    } else {
-      allRsQueries.push(qString);
+    // Handle Return Path
+    if (currEdge.data.isPath) {
+        const pathVar = `p${i}`;
+        qString = `${pathVar} = ${qString}`;
+        returnVars.push(pathVar);
     }
+
+    allRsQueries.push(qString);
   }
 
   if (state.predicateLinks && state.predicateLinks.length > 0) {
@@ -320,22 +307,21 @@ const convertToQuery = (state) => {
   }
 
   var allRsQueriesString = allRsQueries.join(', ');
-  var optionalRsQueriesString = optionalRsQueries.length > 0 ? '\n' + optionalRsQueries.map(q => `OPTIONAL MATCH ${q}`).join('\n') : '';
 
   if (joinNodes.length > 0) {
     var jSymbol = joinNodes[0].data.rep;
-    return `MATCH ${loneQueryString}${allRsQueriesString}${optionalRsQueriesString}
+    return `MATCH ${loneQueryString}${allRsQueriesString}
 ${allPredsQueryString}
 OPTIONAL MATCH (${jSymbol})--(o)
 RETURN ${jSymbol}, COLLECT(o) AS others`;
   }
 
   return allPredsQueryString ?
-    `MATCH ${loneQueryString}${allRsQueriesString}${optionalRsQueriesString}
+    `MATCH ${loneQueryString}${allRsQueriesString}
 ${allPredsQueryString}
 RETURN ${returnVars.join(', ')}` :
 
-    `MATCH ${loneQueryString}${allRsQueriesString}${optionalRsQueriesString}
+    `MATCH ${loneQueryString}${allRsQueriesString}
 RETURN ${returnVars.join(', ')}`
 
 

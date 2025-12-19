@@ -75,7 +75,7 @@ function CustomEdge({
   const markerEnd = getMarkerEnd(directed === true ? arrowHeadType : '', markerEndId);
 
   const predicates = data.predicates ?? {}
-  const {rs, cardinality, isOptional, cardinalityProps} = data
+  const {rs, cardinality, isPath, cardinalityProps} = data
   const isDirected = arrowHeadType === "arrowclosed"
 
   useEffect(() => {
@@ -145,11 +145,11 @@ function CustomEdge({
     _internalDispatchGraph(graph);
   };
 
-  const updateEdgeIsOptional = async (newIsOptional) => {
+  const updateEdgeIsPath = async (newIsPath) => {
     const graph = VA.update(state, "EDGE", {
       edge: id,
       prop: 'data',
-      newVal: {...data, isOptional: newIsOptional, predicates: {}}
+      newVal: {...data, isPath: newIsPath}
     });
     _internalDispatchGraph(graph);
   }
@@ -497,42 +497,6 @@ function CustomEdge({
           ))}
         </>
       )}
-      {isOptional && (
-        <Tooltip
-          title={
-            <>
-              <div style={{fontWeight: 'bold'}}>Optional Join</div>
-              <div style={{marginTop: 4, fontSize: 12, color: '#ffffffff'}}>
-                OPTIONAL MATCH: Get a collection of all nodes connected to <b>{data.source}</b>
-              </div>
-            </>
-          }
-          placement="bottom"
-          overlayStyle={{ zIndex: 9999, maxWidth: 220 }}
-        >
-          <g>
-            <rect
-              x={midX - 18}
-              y={midY + 10}
-              width={36}
-              height={21}
-              rx={8}
-              fill="#ebbcf3ff"
-              stroke="#888"
-              strokeWidth={1}
-              opacity={0.85}
-            />
-            <image
-              href={joinIcon}
-              x={midX - 18}
-              y={midY + 9}
-              width={36}
-              height={20}
-              style={{ pointerEvents: 'none' }}
-            />
-          </g>
-        </Tooltip>
-      )}
       <EdgeModal
         source={data.source}
         destination={data.destination}
@@ -542,12 +506,12 @@ function CustomEdge({
         allRs={availRs}
         rs={rs}
         cardinality={cardinality}
-        isOptional={isOptional}
+        isPath={isPath}
         cardinalityProps={cardinalityProps}
         visible={id === state.modalVisible}
         updateEdgeRs={updateEdgeRs}
         updateEdgeCardinality={updateEdgeCardinality}
-        updateEdgeIsOptional={updateEdgeIsOptional}
+        updateEdgeIsPath={updateEdgeIsPath}
         predicates={predicates}
         addPredicate={addPredicate}
         updatePredicate={updatePredicate}

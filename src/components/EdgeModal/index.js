@@ -1,4 +1,4 @@
-import React, {useState, useContext} from 'react';
+import React, {useState, useContext, useEffect} from 'react';
 import {Button, Drawer, Typography, Select, Divider, Tag, Tooltip} from 'antd';
 import {ArrowLeftOutlined} from '@ant-design/icons'
 import { InputNumber, Checkbox } from 'antd';
@@ -18,7 +18,8 @@ const EdgeModal = ({
   allRs,
   updateEdgeRs,
   updateEdgeCardinality,
-  updateEdgeIsOptional,
+  updateEdgeIsPath,
+  isPath: isPathProp,
   predicates,
   addPredicate,
   updatePredicate,
@@ -32,8 +33,13 @@ const EdgeModal = ({
   const [childrenDrawer, setChildDrawer] = useState({});
   const [cardinality, setCardinality] = useState({ min: 1, max: 1 });
   const [cardOp, setCardOp] = useState('=');
-  const [isOptional, setIsOptional] = useState(false);
+  const [isPath, setIsPath] = useState(false);
   const [cardinalityProps, setCardinalityProps] = useState([]);
+
+  useEffect(() => {
+    setIsPath(isPathProp);
+  }, [isPathProp]);
+
   const rsOptions = Object.keys(allRs ?? {})
   const rsAttributes = rs && allRs[rs] ? allRs[rs] : []
 
@@ -161,19 +167,19 @@ const EdgeModal = ({
 
         }
 
-        {/*Joins*/}
-          <Divider orientation="left">Joins : Optional Match</Divider>
+        {/*Return Path*/}
+          <Divider orientation="left">Return Path</Divider>
           <div style={{padding: '0px 15px 10px'}}>
             <Checkbox
-              checked={isOptional}
+              checked={isPath}
               onChange={e => {
                 console.log(e);
-                setIsOptional(e.target.checked);
-                updateEdgeIsOptional(e.target.checked);
-                e.target.checked = isOptional;
+                setIsPath(e.target.checked);
+                updateEdgeIsPath(e.target.checked);
+                e.target.checked = isPath;
               }}
             >
-              Join (use OPTIONAL MATCH)
+              Return Path (MATCH p = ...)
             </Checkbox>
           </div>
 

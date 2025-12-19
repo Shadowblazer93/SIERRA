@@ -212,15 +212,15 @@ function Node(props) {
           background: props.data.color,
           height: `${displayRadius * 2}px`,
           width: `${displayRadius * 2}px`,
-          border: props.data.isBold ? '1px solid #2F2F2F' : '',
+          border: props.data.isBold ? '2px solid rgba(47, 47, 47, 0.4)' : '',
           position: 'absolute',
           left: 0,
           top: 0,
           zIndex: 1
         }}
       >
-        <Handle type="target" position="left" style={{ zIndex: 100, height: '0.6rem', width: '0.6rem' }} />
-        <Handle type="source" position="right" style={{ zIndex: 100, height: '0.6rem', width: '0.6rem' }} />
+        <Handle type="target" position="left" style={{ zIndex: 100, height: '0.5rem', width: '0.5rem', border: '0px solid black' }} />
+        <Handle type="source" position="right" style={{ zIndex: 100, height: '0.5rem', width: '0.5rem', border: '0px solid black' }} />
 
         <div style={{ position: 'relative', top: '50%', transform: 'translateY(-50%)' }}>
           <p className="h6">{props.data.label}</p>

@@ -17,6 +17,7 @@ import {InfoCircleOutlined, CopyOutlined, LoadingOutlined} from '@ant-design/ico
 import Title from 'antd/lib/typography/Title';
 import { getNodeId } from './utils/getNodeId';
 import useVisualActions from './hooks/useVisualActions'
+import JoinGraphView from './components/JoinGraphView';
 const neo4jApi = require('./neo4jApi')
 const pkg = require('../package.json')
 
@@ -184,6 +185,11 @@ function App() {
     }
   };
 
+  const handleEditLink = (link) => {
+    setSelectedLink(link);
+    setJoinModalVisible(true);
+  };
+
   const predicateLinkElements = state.predicateLinks.length > 0
     ? state.predicateLinks.map((link, idx) => ({
         id: `predicate-link-${idx}`,
@@ -277,6 +283,7 @@ function App() {
             </div>
           </div>
 
+          <JoinGraphView onEditLink={handleEditLink} />
           <ReactFlowProvider>
             <CypherTextEditor text={cypherQuery}/>
 

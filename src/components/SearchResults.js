@@ -53,11 +53,19 @@ function SearchResults(props) {
           <table className="w-100">
             <thead>
               <tr>
-                {props.result[0]._fields.map(function (node, index) {
+                {props.result[0]._fields.map(function (val, index) {
+                  let headerText = "";
+                  if (val && val.labels) {
+                    headerText = val.labels;
+                  } else if (val && val.segments) {
+                    headerText = "Path";
+                  } else {
+                    headerText = props.result[0].keys[index];
+                  }
                   return (
                     // set colour of column headers to respective colour of node in constructed query graph
                     <td key={index} style={{ background: coloursArr[index] }}>
-                      <b>{node.labels}</b>
+                      <b>{headerText}</b>
                     </td>
                   );
                 })}
@@ -67,20 +75,28 @@ function SearchResults(props) {
               {props.result.map(function (record, index) {
                 return (
                   <tr key={index}>
-                    {record._fields.map(function (node, index) {
+                    {record._fields.map(function (val, index) {
+                      let content = null;
+                      if (val && val.properties) {
+                        content = Object.keys(val.properties).map(function (key, i) {
+                          return (
+                            <div key={i}>
+                              {key}:{' '}
+                              {neo4j.isInt(val.properties[key])
+                                ? neo4j.integer.toString(val.properties[key])
+                                : JSON.stringify(val.properties[key])}
+                            </div>
+                          );
+                        });
+                      } else if (val && val.segments) {
+                         content = <div>Path (length: {val.length})</div>;
+                      } else {
+                         content = JSON.stringify(val);
+                      }
                       return (
                       // set colour of column to respective colour of node in constructed query graph
                         <td key={index} className="px-2" style={{ background: coloursArr[index] }}>
-                          {Object.keys(node.properties).map(function (key, i) {
-                            return (
-                              <div key={i}>
-                                {key}:{' '}
-                                {neo4j.isInt(node.properties[key])
-                                  ? neo4j.integer.toString(node.properties[key])
-                                  : JSON.stringify(node.properties[key])}
-                              </div>
-                            );
-                          })}
+                          {content}
                         </td>
                       );
                     })}

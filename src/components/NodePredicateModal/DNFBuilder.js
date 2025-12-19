@@ -114,8 +114,8 @@ const DNFBuilder = ({ attributes, propData, initialData, onSave }) => {
                     style={{ width: 63 }}
                     onChange={(val) => updatePredicate(row.id, pred.id, 'op', val)}
                   >
-                    {Object.keys(OPERATORS).map(op => (
-                      <Option key={op} value={op}>{OPERATORS[op]}</Option>
+                    {OPERATORS.map(op => (
+                      <Option key={op} value={op}>{op}</Option>
                     ))}
                   </Select>
                   <Select

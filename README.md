@@ -1,5 +1,9 @@
 # SIERRA: A Visual Graph Query Interface for property graphs
 
+- Try SIERRA : https://Shadowblazer93.github.io/SIERRA
+
+- SIERRA 1.3.7 Demo Video : https://youtu.be/ogFBnBrBaP8
+
 ## Running the Project
 
 First, open "C:\Program Files\neo4j-community-4.4.16\conf\neo4j.conf"

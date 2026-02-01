@@ -20,6 +20,7 @@ const EdgeModal = ({
   updateEdgeCardinality,
   updateEdgeIsPath,
   isPath: isPathProp,
+  cardinality: cardinalityProp,
   predicates,
   addPredicate,
   updatePredicate,
@@ -31,14 +32,21 @@ const EdgeModal = ({
   //..
   const [state, dispatch] = useContext(Context);
   const [childrenDrawer, setChildDrawer] = useState({});
-  const [cardinality, setCardinality] = useState({ min: 1, max: 1 });
-  const [cardOp, setCardOp] = useState('=');
+  const [cardinality, setCardinality] = useState(cardinalityProp || { min: 1, max: 1 });
+  const [cardOp, setCardOp] = useState(cardinalityProp?.op || '=');
   const [isPath, setIsPath] = useState(false);
   const [cardinalityProps, setCardinalityProps] = useState([]);
 
   useEffect(() => {
     setIsPath(isPathProp);
   }, [isPathProp]);
+
+  useEffect(() => {
+    if (cardinalityProp) {
+        setCardinality(cardinalityProp);
+        setCardOp(cardinalityProp.op || '=');
+    }
+  }, [cardinalityProp]);
 
   const rsOptions = Object.keys(allRs ?? {})
   const rsAttributes = rs && allRs[rs] ? allRs[rs] : []
@@ -179,7 +187,7 @@ const EdgeModal = ({
                 e.target.checked = isPath;
               }}
             >
-              Return Path (MATCH p = ...)
+              Return Path Length
             </Checkbox>
           </div>
 

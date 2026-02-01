@@ -22,6 +22,7 @@ function Node(props) {
   const [state, dispatch] = useContext(Context);
   const [propData, setPropData] = useState([]);
   const [hoveredPredicate, setHoveredPredicate] = useState(null);
+  const [nodeHovered, setNodeHovered] = useState(false);
   const predicates = props.data.predicates ?? {};
 
   const dnfRows = (props.data.dnf || []).filter(r => r.predicates && r.predicates.length > 0);
@@ -208,6 +209,8 @@ function Node(props) {
             handleClick(e);
           }
         }}
+        onMouseEnter={() => setNodeHovered(true)}
+        onMouseLeave={() => setNodeHovered(false)}
         style={{
           background: props.data.color,
           height: `${displayRadius * 2}px`,
@@ -223,7 +226,20 @@ function Node(props) {
         <Handle type="source" position="right" style={{ zIndex: 100, height: '0.5rem', width: '0.5rem', border: '0px solid black' }} />
 
         <div style={{ position: 'relative', top: '50%', transform: 'translateY(-50%)' }}>
-          <p className="h6">{props.data.label}</p>
+          <p className="h6" style={{
+            position: 'absolute', top: 0, left: '50%', transform: 'translate(-50%, -50%)',
+            margin: 0, width: 'max-content', pointerEvents: 'none',
+            opacity: nodeHovered ? 0 : 1, transition: 'opacity 0.2s ease'
+          }}>
+            {props.data.label}
+          </p>
+          <p className="h6" style={{
+            position: 'absolute', top: 0, left: '50%', transform: 'translate(-50%, -50%)',
+            margin: 0, width: 'max-content', pointerEvents: 'none',
+            opacity: nodeHovered ? 1 : 0, transition: 'opacity 0.2s ease', color: '#5c5c5c'
+          }}>
+            {props.data.rep || (parseInt(props.id) + 10).toString(36)}
+          </p>
         </div>
 
         {props.data.isJoin && (

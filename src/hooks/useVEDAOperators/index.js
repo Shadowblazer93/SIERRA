@@ -143,7 +143,7 @@ const useVEDAOperators = () => {
       const circle = new Circle({
         id,
         position: { x: 500, y: 200 },
-        color: COLORS[parseInt(id, 10)],
+        color: COLORS[Math.floor(Math.random() * COLORS.length)],
         type: 'special',
         componentType: "NODE",
         ...payload,

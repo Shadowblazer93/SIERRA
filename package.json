@@ -1,6 +1,6 @@
 {
   "name": "sierra",
-  "version": "1.3.7",
+  "version": "1.3.8",
   "homepage": ".",
   "private": false,
   "browserslist": {
@@ -102,7 +102,7 @@
     "less-loader": "^8.0.0",
     "lint-staged": "^10.5.4",
     "mini-css-extract-plugin": "^1.3.9",
-    "node-sass": "^5.0.0",
+    "sass": "^1.77.0",
     "path": "^0.12.7",
     "prettier": "^2.2.1",
     "react-hot-loader": "^4.13.0",
@@ -111,7 +111,7 @@
     "sinon": "^9.2.4",
     "style-loader": "^2.0.0",
     "terser-webpack-plugin": "^5.1.1",
-    "url-loader": "1.1.2",
+    "url-loader": "^4.1.1",
     "webpack": "^5.34.0",
     "webpack-async-chunk-names-plugin": "^0.1.1",
     "webpack-bundle-analyzer": "^4.4.0",

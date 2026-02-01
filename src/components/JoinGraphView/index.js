@@ -278,6 +278,15 @@ const JoinGraphView = ({ onEditLink }) => {
   const nodePositions = useRef({});
 
   useEffect(() => {
+    const linkCount = state.predicateLinks.length;
+    if (linkCount >= 1) {
+      setShowJoinView(true);
+    } else if (linkCount === 0) {
+      setShowJoinView(false);
+    }
+  }, [state.predicateLinks.length]);
+
+  useEffect(() => {
     const checkLinks = async () => {
       const newWarnings = {};
       const neededLabels = new Set();

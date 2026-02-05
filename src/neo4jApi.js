@@ -7,26 +7,58 @@ const neo4jVersion = process.env.NEO4J_VERSION;
 let database = 'northwind';
 let user = database;
 let password = database;
+let currentUri = "bolt+s://demo.neo4jlabs.com:7687";
 
 if (!neo4jVersion.startsWith('4')) {
   database = null;
 }
 function createDriver() {
-  return neo4j.driver("bolt+s://demo.neo4jlabs.com:7687",neo4j.auth.basic(user, password));
+  return neo4j.driver(currentUri, neo4j.auth.basic(user, password));
 }
 async function setDatabase(db) {
-  database = db && db.length ? db : process.env.NEO4J_DATABASE;
-  user = database;
-  password = database;
+  let nextDatabase, nextUser, nextPassword, nextUri;
+
+  if (typeof db === 'object' && db !== null) {
+    // Custom database connection
+    nextDatabase = db.database;
+    nextUser = db.username;
+    nextPassword = db.password;
+    nextUri = db.uri;
+  } else {
+    // Demo database
+    nextDatabase = db && db.length ? db : process.env.NEO4J_DATABASE;
+    nextUser = nextDatabase;
+    nextPassword = nextDatabase;
+    nextUri = "bolt+s://demo.neo4jlabs.com:7687";
+  }
+
+  const nextDriver = neo4j.driver(nextUri, neo4j.auth.basic(nextUser, nextPassword));
+
+  try {
+    await nextDriver.verifyConnectivity();
+  } catch (error) {
+    console.error("Failed to connect to Neo4j:", error);
+    await nextDriver.close();
+    alert("Connection failed. Please check your neo4j credentials. Reverting to demo database.");
+    window.location.reload();
+    return;
+  }
+
   await driver.close();
-  driver = createDriver();
+  driver = nextDriver;
+  
+  database = nextDatabase;
+  user = nextUser;
+  password = nextPassword;
+  currentUri = nextUri;
+
   return database;
 }
 function getDatabase(db) {
   return database;
 }
 
-let driver = neo4j.driver("bolt+s://demo.neo4jlabs.com:7687", neo4j.auth.basic(user, password));
+let driver = createDriver();
 
 // fetch all node entities and list of neighbours for each node entity
 async function setUp() {

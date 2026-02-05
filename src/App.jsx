@@ -12,8 +12,8 @@ import CustomEdge from './components/CustomEdge';
 import PredicateLinkEdge from './components/PredicateLinkEdge';
 import PredicateLinkModal from './components/PredicateLinkModal';
 import ConfirmationAlert from './components/ConfirmationAlert';
-import {Button, Spin, Select} from 'antd';
-import {InfoCircleOutlined, CopyOutlined, LoadingOutlined} from '@ant-design/icons'
+import {Button, Spin, Select, Modal, Form, Input} from 'antd';
+import {InfoCircleOutlined, CopyOutlined, LoadingOutlined, ApiOutlined} from '@ant-design/icons'
 import Title from 'antd/lib/typography/Title';
 import { getNodeId } from './utils/getNodeId';
 import useVisualActions from './hooks/useVisualActions'
@@ -33,7 +33,18 @@ function App() {
   const [joinModalVisible, setJoinModalVisible] = useState(false);
   const [selectedLink, setSelectedLink] = useState(null);
   const [cypherQuery, setCypherQuery] = useState('');
-  const [databaseSource, setDatabaseSource] = useState('northwind')
+  const [databaseSource, setDatabaseSource] = useState('northwind');
+  
+  const [connectModalVisible, setConnectModalVisible] = useState(false);
+  const [form] = Form.useForm();
+  
+  const handleDatabaseChange = (value) => {
+    if (value === 'connect-database') {
+      setConnectModalVisible(true);
+    } else {
+      setDatabaseSource(value);
+    }
+  };
 
   //* only for user study
   // const [userStudyDataset, setUserStudyDataset] = useState('Northwind')
@@ -206,38 +217,39 @@ function App() {
       }))
     : [];
 
-  const renderContent = () => {
-    if(pageStatus  === "LOADING") {
-      return (
-        <div className="loading-screen">
-          <div className="spinner-layer" aria-hidden>
-            <LoadingOutlined className="spin spin-1" />
-            <LoadingOutlined className="spin spin-2" />
-            <LoadingOutlined className="spin spin-3" />
-          </div>
-          <Title style={{ color: '#0b3d91', fontSize: 70, fontFamily: 'monospace', fontWeight: 700}}>SIERRA</Title>
-          <div style={{ marginTop: -40, color: '#6b7280', fontSize: 20, fontFamily: 'monospace' }}>Loading...</div>
+  const loadingOverlay = (
+    <div className={`loading-screen ${pageStatus === 'READY' ? 'fade-out' : ''}`}>
+      <div className="spinner-layer" aria-hidden>
+        <LoadingOutlined className="spin spin-1" />
+        <LoadingOutlined className="spin spin-2" />
+        <LoadingOutlined className="spin spin-3" />
+      </div>
+      <Title style={{ color: '#0b3d91', fontSize: 70, fontFamily: 'monospace', fontWeight: 700}}>SIERRA</Title>
+      <div style={{ marginTop: -40, color: '#6b7280', fontSize: 20, fontFamily: 'monospace' }}>Loading...</div>
 
-          {/* version badge */}
-          <div style={{
-            position: 'fixed',
-            right: 12,
-            bottom: 8,
-            fontSize: 12,
-            fontWeight: 500,
-            color: '#000000ff',
-            background: 'rgba(120, 192, 255, 0.7)',
-            padding: '4px 8px',
-            borderRadius: 6,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
-          }}>
-            v{pkg.version}
-          </div>
-        </div>
-      )
-    } else if (pageStatus === "READY") {
-      return (
-        <>
+      {/* version badge */}
+      <div style={{
+        position: 'fixed',
+        right: 12,
+        bottom: 8,
+        fontSize: 12,
+        fontWeight: 500,
+        color: '#000000ff',
+        background: 'rgba(120, 192, 255, 0.7)',
+        padding: '4px 8px',
+        borderRadius: 6,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
+      }}>
+        v{pkg.version}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="App" id="app-root">
+      {loadingOverlay}
+      
+      <>
           <div>
             <div className="main-buttons">
               {state.modalVisible !== '' && (<div style={{width: 363}}/>)}
@@ -248,21 +260,27 @@ function App() {
               </Title>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 7 }}>
                 <Select
-                  value={databaseSource}
-                  onChange={setDatabaseSource}
+                  value={typeof databaseSource === 'string' ? databaseSource : (databaseSource.database || 'Custom Database')}
+                  onChange={handleDatabaseChange}
                   style={{ width: 160 }}
                   size="middle"
                 >
-                  <Select.Option value="recommendations">Recommendations</Select.Option>
-                  <Select.Option value="movies">Movies</Select.Option>
-                  <Select.Option value="northwind">NorthWind</Select.Option>
-                  <Select.Option value="fincen">Fincen</Select.Option>
-                  <Select.Option value="twitter">Twitter</Select.Option>
-                  {/* <Select.Option value="stackoverflow">StackOverFlow</Select.Option> */}
-                  <Select.Option value="gameofthrones">GameOfThrones</Select.Option>
-                  {/* <Select.Option value="neoflix">NeoFlix</Select.Option> */}
-                  {/* <Select.Option value="wordnet">WordNet</Select.Option> */}
-                  {/* <Select.Option value="slack">Slack</Select.Option> */}
+                  <Select.Option value="connect-database" style={{ backgroundColor: '#1890ff', color: 'white', fontSize: 13 }}>
+                    <ApiOutlined style={{ marginRight: 8 }} />
+                    Connect Database
+                  </Select.Option>
+                  <Select.OptGroup label="Demo Databases">
+                    <Select.Option value="recommendations">Recommendations</Select.Option>
+                    <Select.Option value="movies">Movies</Select.Option>
+                    <Select.Option value="northwind">NorthWind</Select.Option>
+                    <Select.Option value="fincen">Fincen</Select.Option>
+                    <Select.Option value="twitter">Twitter</Select.Option>
+                    {/* <Select.Option value="stackoverflow">StackOverFlow</Select.Option> */}
+                    <Select.Option value="gameofthrones">GameOfThrones</Select.Option>
+                    {/* <Select.Option value="neoflix">NeoFlix</Select.Option> */}
+                    {/* <Select.Option value="wordnet">WordNet</Select.Option> */}
+                    {/* <Select.Option value="slack">Slack</Select.Option> */}
+                  </Select.OptGroup>
                 </Select>
               </div>
               <NewNodeDrawButton addNode={addNode} />
@@ -352,15 +370,73 @@ function App() {
             onDelete={handleDeleteLink}
             onUpdate={handleUpdateLink}
           />
+          
+          <Modal
+            title="Connect to Database"
+            visible={connectModalVisible}
+            onOk={() => {
+              form
+                .validateFields()
+                .then((values) => {
+                  form.resetFields();
+                  let { uri } = values;
+                  // Check for existing protocol
+                  if (!/^[a-z0-9+.-]+:\/\//i.test(uri)) {
+                    uri = `bolt+s://${uri}`;
+                  }
+                  
+                  setDatabaseSource({ ...values, uri });
+                  setConnectModalVisible(false);
+                })
+                .catch((info) => {
+                  console.log('Validate Failed:', info);
+                });
+            }}
+            onCancel={() => setConnectModalVisible(false)}
+          >
+            <Form
+              form={form}
+              layout="vertical"
+              name="form_in_modal"
+              initialValues={{
+                uri: 'localhost:7687',
+                username: 'neo4j',
+                database: 'neo4j'
+              }}
+            >
+              <Form.Item
+                name="uri"
+                label="Connection URI"
+                rules={[{ required: true, message: 'Please input the URI of the database!' }]}
+              >
+                <Input addonBefore="bolt+s://" />
+              </Form.Item>
+              <Form.Item
+                name="database"
+                label="Database Name"
+                rules={[{ required: true, message: 'Please input the database name!' }]}
+              >
+                <Input />
+              </Form.Item>
+              <Form.Item
+                name="username"
+                label="Username"
+                rules={[{ required: true, message: 'Please input the username!' }]}
+              >
+                <Input />
+              </Form.Item>
+              <Form.Item
+                name="password"
+                label="Password"
+                rules={[{ required: true, message: 'Please input the password!' }]}
+              >
+                <Input.Password />
+              </Form.Item>
+            </Form>
+          </Modal>
 
           {showResults ? <SearchResults result={searchResult.result} query={searchResult.query} hide={() => setShowResults(false)} /> : null}
         </>
-      )
-    }
-  }
-  return (
-    <div className="App" id="app-root">
-      {renderContent()}
     </div>
   );
 }

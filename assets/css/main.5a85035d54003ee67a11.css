@@ -164,7 +164,39 @@ td {
   100% {
     background-position: -1000px -1000px;
   }
+}.loading-screen { transition: opacity 0.6s ease-out, visibility 0.6s; z-index: 10000; position: fixed; top: 0; left: 0; } .loading-screen.fade-out { opacity: 0; visibility: hidden; pointer-events: none; }
+
+/* Dark Mode */
+.dark-mode {
+  background-color: #121212;
+  color: #e0e0e0;
 }
+
+.dark-mode .ant-typography {
+  color: #e0e0e0 !important;
+}
+
+.dark-mode .loading-screen {
+  background-color: #121212;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+}
+
+.dark-mode .loading-screen .ant-typography {
+  color: #5d9cec !important; 
+}
+
+.dark-mode .controls-custom button {
+  background-color: #333;
+  fill: white;
+  border-bottom: 1px solid #555;
+}
+
+.dark-mode .controls-custom button:hover {
+  background-color: #444;
+}
+
 .predicate-container {
   border-radius: 4px;
   padding: 10px 12px;

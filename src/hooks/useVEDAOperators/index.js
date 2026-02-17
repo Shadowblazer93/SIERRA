@@ -52,10 +52,40 @@ const useVEDAOperators = () => {
       if (op[0] === "CIRCLE") {
         let arr = op[1].split(".")
         if (arr.length === 1) {
-          //* add a new node
+          //* delete a node and its connections
+          const nodeToDelete = payload.el;
+          
+          // Filter out edges connected to the deleted node
+          const edgesTokeep = graph.edges.filter(edge => 
+            edge.source !== nodeToDelete.id && edge.target !== nodeToDelete.id
+          );
+
+          // Get the edges that are being removed
+          const deletedEdges = graph.edges.filter(edge => 
+            edge.source === nodeToDelete.id || edge.target === nodeToDelete.id
+          );
+          
+          let newNodes = removeElements([nodeToDelete], graph.nodes);
+
+          // Check if neighbors are now isolated
+          deletedEdges.forEach(edge => {
+            const neighborId = edge.source === nodeToDelete.id ? edge.target : edge.source;
+            
+            // Check if this neighbor has any other edges in the REMAINING edges
+            const isConnected = edgesTokeep.some(e => e.source === neighborId || e.target === neighborId);
+            
+            if (!isConnected) {
+              const neighbor = newNodes.find(n => n.id === neighborId);
+              if (neighbor && neighbor.data) {
+                  neighbor.data.connected = false;
+              }
+            }
+          });
+
           return {
             ...graph,
-            nodes: removeElements([payload.el], graph.nodes)
+            nodes: newNodes,
+            edges: edgesTokeep
           }
         } else {
           return this.deletePredicate(graph, payload)
@@ -366,14 +396,14 @@ const useVEDAOperators = () => {
         var srcId = elementsToRemove.source;
         var destId = elementsToRemove.target;
         // if nodes connected by the removed edge are no longer connected in graph, set data.connected to false
-        if (updatedEdges.find((el) => el.source === srcId || el.dest === srcId) === undefined) {
+        if (updatedEdges.find((el) => el.source === srcId || el.target === srcId) === undefined) {
           const srcNode = newNodes.find(el => el.id === srcId)
           if(srcNode){
             srcNode.data.connected = false
           }
         }
-        if (updatedEdges.find((el) => el.source === destId || el.dest === destId) === undefined) {
-          const destNode = newNodes.find(el => el.id === srcId)
+        if (updatedEdges.find((el) => el.source === destId || el.target === destId) === undefined) {
+          const destNode = newNodes.find(el => el.id === destId)
           if(destNode){
             destNode.data.connected = false
           }

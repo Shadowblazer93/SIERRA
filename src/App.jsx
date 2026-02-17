@@ -112,13 +112,13 @@ function App() {
     })
   }
   const onElementsRemove = (elementsToRemove) => {
-    let graph
+    let graph = state;
     console.log(elementsToRemove)
     for(const el of elementsToRemove){
-      if(el.data.label){
-        graph = VA.delete(state, "NODE", {label: el.data.label, el: el})
+      if(el.data && el.data.label){
+        graph = VA.delete(graph, "NODE", {label: el.data.label, el: el})
       } else {
-        graph = VA.delete(state, "EDGE", {
+        graph = VA.delete(graph, "EDGE", {
           el: el,
         })
       }

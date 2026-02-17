@@ -427,7 +427,14 @@ function Node(props) {
         }).join(' AND ');
 
         return (
-          <Tooltip key={row.id} title={tooltipContent} placement="top">
+          <Tooltip key={row.id} title={tooltipContent}
+            color='geekblue'
+            placement="bottom"
+            overlayStyle={{ zIndex: 9999, maxWidth:220 }}
+            mouseEnterDelay={0}
+            mouseLeaveDelay={0}
+            destroyTooltipOnHide
+            getPopupContainer={() => document.body}>
             <div
               onClick={(e) => { e.stopPropagation(); setShowDetails(true); }}
               style={{

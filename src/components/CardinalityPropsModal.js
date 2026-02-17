@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Drawer, Input, Button, Space, Typography, Divider, InputNumber, Select } from 'antd';
+import { Drawer, Input, Button, Space, Typography, Divider, InputNumber, Select, AutoComplete } from 'antd';
 import {ArrowLeftOutlined} from '@ant-design/icons'
 import { COLORS_HEX, OPERATORS } from '../constants';
 
@@ -204,18 +204,17 @@ const CardinalityPropsModal = ({
             <Select value={newOperator} onChange={setNewOperator} style={{ width: 60 }}>
               {OPERATORS.map(op => <Option key={op} value={op}>{op}</Option>)}
             </Select>
-            <Select
+            <AutoComplete
               placeholder="Value"
-              value={newValue || undefined}
+              value={newValue}
               onChange={setNewValue}
               style={{ width: 120 }}
-              showSearch
               disabled={!newKey}
-            >
-              {availableValues.map((val, i) => (
-                <Option key={`${val}-${i}`} value={val}>{String(val)}</Option>
-              ))}
-            </Select>
+              options={availableValues.map((val, i) => ({ value: String(val), key: `${val}-${i}` }))}
+              filterOption={(inputValue, option) =>
+                option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+              }
+            />
             <Input
             type="color"
             value={newColor}

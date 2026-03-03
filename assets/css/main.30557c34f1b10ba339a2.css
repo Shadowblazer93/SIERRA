@@ -50,22 +50,72 @@
 
 .result-modal-center {
   position: absolute;
-  background-color: #F5F5F5;
+  background-color: #ffffff;
   margin-left: auto;
   margin-right: auto;
   bottom: 10%;
   left: 0;
   right: 0;
   text-align: center;
-  padding-left: 3rem;
-  padding-right: 3rem;
-  padding-top: 1.5rem;
-  padding-bottom: 1.5rem;
+  padding: 2rem;
   z-index: 30;
   height: 75%;
   width: fit-content;
-  max-width: 68%;
-  overflow: scroll;
+  min-width: 50%;
+  max-width: 80%;
+  overflow: auto;
+  border-radius: 20px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.result-modal-center table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-top: 1rem;
+}
+
+.result-modal-center thead td {
+  padding: 16px;
+  font-weight: 600;
+  color: #333;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+  border: none;
+  border-bottom: 2px solid black;
+}
+
+.result-modal-center thead tr td:first-child {
+  border-top-left-radius: 12px;
+}
+.result-modal-center thead tr td:last-child {
+  border-top-right-radius: 12px;
+}
+
+.result-modal-center tbody td {
+  padding: 14px 16px;
+  color: #555;
+  background-color: white;
+  border-bottom: 1px solid #aaa;
+  font-size: 0.95rem;
+}
+
+.result-modal-center tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.result-modal-center tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 12px;
+}
+
+.result-modal-center tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 12px;
+}
+
+.result-modal-center tbody tr:hover td {
+  background-color: #fafafa;
 }
 
 .center {
@@ -74,12 +124,6 @@
   top: 50%;
   transform: translate(-50%, -50%);
   z-index: 200;
-}
-
-table,
-th,
-td {
-  border: 1px solid black;
 }
 
 td {
@@ -312,5 +356,17 @@ ul li::marker {
   align-items: center;
   font-weight: bold;
   font-size: 14px;
+}
+
+.query-controls-container {
+    position: absolute;
+    top: 300px;
+    right: 20px;
+    background: #fff;
+    padding: 10px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    width: 275px;
 }
 

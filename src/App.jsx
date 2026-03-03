@@ -18,6 +18,7 @@ import Title from 'antd/lib/typography/Title';
 import { getNodeId } from './utils/getNodeId';
 import useVisualActions from './hooks/useVisualActions'
 import JoinGraphView from './components/JoinGraphView';
+import QueryControls from './components/QueryControls';
 const neo4jApi = require('./neo4jApi')
 const pkg = require('../package.json')
 
@@ -35,6 +36,15 @@ function App() {
   const [cypherQuery, setCypherQuery] = useState('');
   const [databaseSource, setDatabaseSource] = useState('northwind');
   
+  const [queryOptions, setQueryOptions] = useState({
+    limit: '',
+    skip: '',
+    distinct: false,
+    orderBys: [], // Changed from orderBy string to array of objects { field, direction }
+    withClauses: [], // Changed from withClause string to array of objects { expression, alias }
+    returnClause: ''
+  });
+
   const [connectModalVisible, setConnectModalVisible] = useState(false);
   const [form] = Form.useForm();
   
@@ -57,10 +67,64 @@ function App() {
 
   useEffect(() => {
     if(state.nodes && state.nodes.length > 0){
-      const cypherString = api.convertToQuery(state)
-      setCypherQuery(cypherString)
+      let query = api.convertToQuery(state)
+      
+      // Apply Query Options
+      if (queryOptions.returnClause) {
+        const lastReturnIndex = query.lastIndexOf('RETURN');
+        if (lastReturnIndex !== -1) {
+            const pre = query.substring(0, lastReturnIndex);
+            query = pre + `RETURN ${queryOptions.returnClause}`;
+        } else {
+            query += `\nRETURN ${queryOptions.returnClause}`;
+        }
+      }
+
+      if (queryOptions.distinct) {
+          const lastReturnIndex = query.lastIndexOf('RETURN');
+          if (lastReturnIndex !== -1) {
+            const chunk = query.substring(lastReturnIndex);
+            if (!chunk.toUpperCase().startsWith('RETURN DISTINCT')) {
+                  const pre = query.substring(0, lastReturnIndex);
+                  const post = query.substring(lastReturnIndex + 6); 
+                  query = pre + 'RETURN DISTINCT' + post;
+            }
+          }
+      }
+
+      if (queryOptions.withClauses && queryOptions.withClauses.length > 0) {
+          const withs = queryOptions.withClauses
+            .filter(w => w.expression)
+            .map(w => w.alias ? `${w.expression} AS ${w.alias}` : w.expression)
+            .join(', ');
+          
+          if (withs) {
+              query += `\nWITH ${withs}`;
+          }
+      }
+
+      if (queryOptions.orderBys && queryOptions.orderBys.length > 0) {
+          const orders = queryOptions.orderBys
+            .filter(o => o.field)
+            .map(o => `${o.field} ${o.direction}`)
+            .join(', ');
+            
+          if (orders) {
+              query += `\nORDER BY ${orders}`;
+          }
+      }
+      
+      if (queryOptions.skip) {
+          query += `\nSKIP ${queryOptions.skip}`;
+      }
+
+      if (queryOptions.limit) {
+          query += `\nLIMIT ${queryOptions.limit}`;
+      }
+
+      setCypherQuery(query)
     }
-  }, [state])
+  }, [state, queryOptions])
 
   useEffect(() => {
     async function fetchData() {
@@ -212,6 +276,8 @@ function App() {
         data: {
           fromAttr: link.from.attr,
           toAttr: link.to.attr,
+          operator: link.operator,
+          joinType: link.joinType,
           onLinkClick: handleLinkClick
         }
       }))
@@ -302,6 +368,10 @@ function App() {
           </div>
 
           <JoinGraphView onEditLink={handleEditLink} />
+          <QueryControls 
+            options={queryOptions} 
+            onOptionsChange={setQueryOptions}
+          />
           <ReactFlowProvider>
             <CypherTextEditor text={cypherQuery}/>
 
@@ -435,7 +505,19 @@ function App() {
             </Form>
           </Modal>
 
-          {showResults ? <SearchResults result={searchResult.result} query={searchResult.query} hide={() => setShowResults(false)} /> : null}
+          {showResults ? 
+            <SearchResults 
+              result={searchResult.result} 
+              query={searchResult.query} 
+              hide={() => setShowResults(false)}
+              colMap={state.nodes.reduce((acc, node) => {
+                if(node.data && node.data.rep) {
+                   acc[node.data.rep] = typeof node.color === 'object' ? node.color.light : node.color;
+                }
+                return acc;
+              }, {})}
+            /> 
+            : null}
         </>
     </div>
   );

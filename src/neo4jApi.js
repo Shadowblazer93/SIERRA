@@ -156,16 +156,53 @@ async function getResult(queryString) {
 
 const convertToQuery = (state) => {
   var loneNodeQueries = [];
-  var returnVars = [];
+  var simpleReturnVars = []; // For nodes and edge paths (non-aggregated)
+  var aggregationEntries = []; // Objects: { expr, alias, operator, value, hasCondition, isLegacy }
   var allPredsArr = [];
+  
   for (var i = 0; i < state.nodes.length; i++) {
     var curNode = state.nodes[i];
-    if(curNode.data['rep'] && curNode.isBold) {
-      returnVars.push(curNode.data.rep);
-    } else if (curNode.isBold) {
+    if (!curNode.data['rep']) {
       curNode.data['rep'] = (parseInt(curNode.id) + 10).toString(36);
-      returnVars.push(curNode.data.rep);
     }
+
+    if (curNode.isBold) {
+      simpleReturnVars.push(curNode.data.rep);
+    }
+
+    if (curNode.data.aggregations) {
+        if (Array.isArray(curNode.data.aggregations)) {
+            curNode.data.aggregations.forEach((agg, idx) => {
+                const { attribute, function: func } = agg;
+                if (attribute && func) {
+                    const aggStr = `${func}(${curNode.data.rep}.${attribute})`;
+                    
+                    let alias = agg.alias;
+                    let condition = null;
+                    
+                    if (agg.hasCondition && agg.operator && agg.value !== undefined && agg.value !== '') {
+                        if (!alias) alias = `agg_node${curNode.id}_${idx}`;
+                        // Simple check if value is numeric string
+                        const isNum = !isNaN(parseFloat(agg.value)) && isFinite(agg.value);
+                        const val = isNum ? agg.value : `'${agg.value}'`;
+                        condition = `${alias} ${agg.operator} ${val}`;
+                    }
+
+                    aggregationEntries.push({ expr: aggStr, alias: alias, condition: condition, hasCondition: agg.hasCondition });
+                }
+            });
+        } else if (typeof curNode.data.aggregations === 'object') {
+             // Backward compatibility
+            Object.keys(curNode.data.aggregations).forEach(attr => {
+                const aggFunc = curNode.data.aggregations[attr];
+                if (aggFunc) {
+                  const aggStr = `${aggFunc}(${curNode.data.rep}.${attr})`;
+                  aggregationEntries.push({ expr: aggStr, isLegacy: true });
+                }
+            });
+        }
+    }
+
     if (!curNode.data.connected) {
       loneNodeQueries.push(`(${curNode.data.rep}:${curNode.data.label})`);
     }
@@ -303,7 +340,7 @@ const convertToQuery = (state) => {
     if (currEdge.data.isPath) {
         const pathVar = `p${i}`;
         qString = `${pathVar} = ${qString}`;
-        returnVars.push(pathVar);
+        simpleReturnVars.push(pathVar);
     }
 
     allRsQueries.push(qString);
@@ -342,19 +379,59 @@ const convertToQuery = (state) => {
 
   if (joinNodes.length > 0) {
     var jSymbol = joinNodes[0].data.rep;
+    // Join logic with aggregations is complex, assuming basic aggregation return for now or disabling with Join
     return `MATCH ${loneQueryString}${allRsQueriesString}
 ${allPredsQueryString}
 OPTIONAL MATCH (${jSymbol})--(o)
 RETURN ${jSymbol}, COLLECT(o) AS others`;
   }
+  
+  const hasAggConditions = aggregationEntries.some(a => a.hasCondition);
+  
+  if (hasAggConditions) {
+      const withClauseAggs = aggregationEntries.map((a, idx) => {
+          const alias = a.alias || `agg_${idx}`; 
+          a.finalAlias = alias; 
+          return `${a.expr} AS ${alias}`;
+      });
+      
+      const withClauseVars = [
+          ...simpleReturnVars,
+          ...withClauseAggs
+      ];
+      
+      const whereClauses = aggregationEntries
+          .filter(a => a.hasCondition && a.condition)
+          .map(a => a.condition);
 
-  return allPredsQueryString ?
-    `MATCH ${loneQueryString}${allRsQueriesString}
-${allPredsQueryString}
-RETURN ${returnVars.join(', ')}` :
+      const whereStr = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+      
+      const finalReturnVars = [
+          ...simpleReturnVars,
+          ...aggregationEntries.map(a => a.finalAlias)
+      ];
 
-    `MATCH ${loneQueryString}${allRsQueriesString}
-RETURN ${returnVars.join(', ')}`
+      return [
+        `MATCH ${loneQueryString}${allRsQueriesString}`,
+        allPredsQueryString,
+        `WITH ${withClauseVars.join(', ')}`,
+        whereStr,
+        `RETURN ${finalReturnVars.join(', ')}`
+      ].filter(val => val && val.trim() !== '').join('\n');
+
+  } else {
+      // Standard return
+      const finalReturnVars = [
+          ...simpleReturnVars, 
+          ...aggregationEntries.map(a => a.alias ? `${a.expr} AS ${a.alias}` : a.expr)
+      ];
+      
+      return [
+        `MATCH ${loneQueryString}${allRsQueriesString}`,
+        allPredsQueryString,
+        `RETURN ${finalReturnVars.join(', ')}`
+      ].filter(val => val && val.trim() !== '').join('\n');
+  }
 
 
 }

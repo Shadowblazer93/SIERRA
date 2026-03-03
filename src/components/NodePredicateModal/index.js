@@ -1,5 +1,5 @@
-import { Drawer, Button, Divider, Typography, Tooltip } from 'antd';
-import {ArrowLeftOutlined, DeleteOutlined} from '@ant-design/icons'
+import { Drawer, Button, Divider, Typography, Tooltip, Select, Input } from 'antd';
+import {ArrowLeftOutlined, DeleteOutlined, PlusOutlined, FilterOutlined} from '@ant-design/icons'
 import React, {useState, useContext} from 'react';
 import { addEdge } from 'react-flow-renderer';
 import { PRED_COLOR_V2 } from '../../constants';
@@ -19,6 +19,7 @@ const NodePredicateModal = ({
   targets,
   attributes,
   predicates,
+  aggregations,
   dnf,
   addPredicate,
   deletePredicate,
@@ -53,6 +54,18 @@ const NodePredicateModal = ({
       payload: { node: nodeId, prop: 'dnf', newVal: newDNF },
     });
   };
+
+  const isNumeric = (attr) => {
+      if (!propData || propData.length === 0) return true; 
+      for (const row of propData) {
+          const val = row[attr];
+          if (val === undefined || val === null) continue;
+          if (typeof val === 'number') return true;
+          if (typeof val === 'object' && val.low !== undefined && val.high !== undefined) return true;
+          return false;
+      }
+      return true; 
+  }
 
   //* Add Target node (new)
   const addTarget = (destNode) => {
@@ -157,7 +170,140 @@ const NodePredicateModal = ({
 
         </div>
 
-        <Divider orientation="left">Join : Optional Match</Divider>
+        <Divider orientation="left">Aggregations</Divider>
+        <div style={{padding: '0px 15px 10px'}}>
+           {
+               (Array.isArray(aggregations) ? aggregations : []).map((agg, idx) => (
+                   <div key={idx} style={{marginBottom: 8}}>
+                    <div style={{display: 'flex', gap: 8, alignItems: 'center'}}>
+                       <Select 
+                           placeholder="Attribute"
+                           style={{flex: 1}}
+                           value={agg.attribute}
+                           onChange={(val) => {
+                               const newAggs = [...(Array.isArray(aggregations) ? aggregations : [])];
+                               newAggs[idx] = { ...agg, attribute: val };
+                               dispatch({
+                                   type: 'MODIFY_NODE_DATA',
+                                   payload: { node: nodeId, prop: 'aggregations', newVal: newAggs },
+                               });
+                           }}
+                       >
+                           {attributes.map(a => <Select.Option key={a} value={a}>{a}</Select.Option>)}
+                       </Select>
+                       <Select 
+                           placeholder="Function"
+                           style={{width: 100}}
+                           value={agg.function}
+                           onChange={(val) => {
+                               const newAggs = [...(Array.isArray(aggregations) ? aggregations : [])];
+                               newAggs[idx] = { ...agg, function: val };
+                               dispatch({
+                                   type: 'MODIFY_NODE_DATA',
+                                   payload: { node: nodeId, prop: 'aggregations', newVal: newAggs },
+                               });
+                           }}
+                       >
+                           <Select.Option value="COUNT">COUNT</Select.Option>
+                           <Select.Option value="SUM">SUM</Select.Option>
+                           <Select.Option value="AVG">AVG</Select.Option>
+                           <Select.Option value="MIN">MIN</Select.Option>
+                           <Select.Option value="MAX">MAX</Select.Option>
+                           <Select.Option value="COLLECT">COLLECT</Select.Option>
+                       </Select>
+                       <Button 
+                           icon={<FilterOutlined />}
+                           type={agg.hasCondition ? 'primary' : 'default'}
+                           onClick={() => {
+                               const newAggs = [...(Array.isArray(aggregations) ? aggregations : [])];
+                               if (!agg.hasCondition) {
+                                   newAggs[idx] = { ...agg, hasCondition: true, alias: '', operator: '>', value: '' };
+                               } else {
+                                   newAggs[idx] = { ...agg, hasCondition: false };
+                               }
+                               dispatch({
+                                   type: 'MODIFY_NODE_DATA',
+                                   payload: { node: nodeId, prop: 'aggregations', newVal: newAggs },
+                               });
+                           }}
+                       />
+                       <Button 
+                           danger
+                           icon={<DeleteOutlined />}
+                           onClick={() => {
+                               const newAggs = [...(Array.isArray(aggregations) ? aggregations : [])];
+                               newAggs.splice(idx, 1);
+                               dispatch({
+                                   type: 'MODIFY_NODE_DATA',
+                                   payload: { node: nodeId, prop: 'aggregations', newVal: newAggs },
+                               });
+                           }}
+                       />
+                   </div>
+                   
+                   {agg.hasCondition && (
+                       <div style={{display: 'flex', gap: 8, marginTop: 8, paddingLeft: 12, alignItems: 'center'}}>
+                           <FilterOutlined style={{color: '#aaa'}}/>
+                           <Input 
+                               placeholder="Alias"
+                               value={agg.alias}
+                               onChange={(e) => {
+                                   const newAggs = [...aggregations];
+                                   newAggs[idx] = { ...agg, alias: e.target.value };
+                                   dispatch({ type: 'MODIFY_NODE_DATA', payload: { node: nodeId, prop: 'aggregations', newVal: newAggs } });
+                               }}
+                               style={{flex: 1}}
+                           />
+                           <Select
+                               style={{width: 80}}
+                               value={agg.operator}
+                               onChange={(val) => {
+                                   const newAggs = [...aggregations];
+                                   newAggs[idx] = { ...agg, operator: val };
+                                   dispatch({ type: 'MODIFY_NODE_DATA', payload: { node: nodeId, prop: 'aggregations', newVal: newAggs } });
+                               }}
+                           >
+                               {['=', '>', '>=', '<', '<=', '<>'].map(op => <Select.Option key={op} value={op}>{op}</Select.Option>)}
+                           </Select>
+                           <Input 
+                               placeholder="Value"
+                               value={agg.value}
+                               onChange={(e) => {
+                                   const newAggs = [...aggregations];
+                                   newAggs[idx] = { ...agg, value: e.target.value };
+                                   dispatch({ type: 'MODIFY_NODE_DATA', payload: { node: nodeId, prop: 'aggregations', newVal: newAggs } });
+                               }}
+                               style={{flex: 1}}
+                           />
+                       </div>
+                   )}
+
+                      {agg.attribute && ['SUM', 'AVG'].includes(agg.function) && !isNumeric(agg.attribute) && (
+                          <div style={{color: 'red', fontSize: '12px', marginTop: 4}}>
+                              Warning: Applying numeric aggregation to non-numeric type
+                          </div>
+                      )}
+                   </div>
+               ))
+           }
+           <Button 
+               type="dashed" 
+               onClick={() => {
+                   const newAggs = [...(Array.isArray(aggregations) ? aggregations : [])];
+                   newAggs.push({ attribute: attributes[0], function: 'COUNT' });
+                   dispatch({
+                       type: 'MODIFY_NODE_DATA',
+                       payload: { node: nodeId, prop: 'aggregations', newVal: newAggs },
+                   });
+               }} 
+               block 
+               icon={<PlusOutlined />}
+           >
+               Add Aggregation
+           </Button>
+        </div>
+
+        {/* <Divider orientation="left">Join : Optional Match</Divider>
         <div style={{padding: '0px 15px 10px'}}>
           <Button
             type={isJoin ? "primary" : "default"}
@@ -168,7 +314,7 @@ const NodePredicateModal = ({
           >
             {isJoin ? "Joined" : "Join"}
           </Button>
-        </div>
+        </div> */}
 
         <Divider orientation="left">DNF Query Builder</Divider>
         <DNFBuilder 

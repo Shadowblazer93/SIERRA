@@ -471,6 +471,7 @@ function Node(props) {
         targets={props.data.possibleTargets}
         attributes={props.data.attributes}
         predicates={predicates}
+        aggregations={props.data.aggregations || []}
         dnf={props.data.dnf}
         visible={state.modalVisible === props.id}
         addPredicate={addPredicate}

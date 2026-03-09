@@ -159,6 +159,7 @@ const convertToQuery = (state) => {
   var simpleReturnVars = []; // For nodes and edge paths (non-aggregated)
   var aggregationEntries = []; // Objects: { expr, alias, operator, value, hasCondition, isLegacy }
   var allPredsArr = [];
+  var predQueriesMap = {};
   
   for (var i = 0; i < state.nodes.length; i++) {
     var curNode = state.nodes[i];
@@ -206,9 +207,8 @@ const convertToQuery = (state) => {
     if (!curNode.data.connected) {
       loneNodeQueries.push(`(${curNode.data.rep}:${curNode.data.label})`);
     }
-    let nodePredsArr = []
     if (curNode.data.predicates) {
-      const standardPreds = Object.keys(curNode.data.predicates).map(function (attr) {
+      Object.keys(curNode.data.predicates).forEach(function (attr) {
         const preds = curNode.data.predicates[attr].data;
         var predsStringsArr = preds
           .filter(pred => pred[1] !== '' && pred[1] !== undefined && pred[1] !== null)
@@ -217,9 +217,10 @@ const convertToQuery = (state) => {
             const predVal = typeof pred[1] === 'string' ? `'${pred[1]}'` : pred[1];
             return `${curNode.data.rep}.${attr} ${Constants.OPERATORS[op]} ${predVal}`;
           });
-        return predsStringsArr.join(' AND ');
+        if (predsStringsArr.length > 0) {
+          predQueriesMap[`${curNode.id}_${attr}`] = predsStringsArr.join(' AND ');
+        }
       });
-      nodePredsArr = nodePredsArr.concat(standardPreds);
     }
 
     // DNF Predicates
@@ -235,12 +236,51 @@ const convertToQuery = (state) => {
         }).filter(Boolean);
 
         if (dnfGroups.length > 0) {
-            nodePredsArr.push(`(${dnfGroups.join(' OR ')})`);
+            allPredsArr.push(`(${dnfGroups.join(' OR ')})`);
         }
     }
-
-    allPredsArr = allPredsArr.concat(nodePredsArr);
   }
+  var orParents = {};
+  Object.keys(predQueriesMap).forEach(function (key) {
+    orParents[key] = key;
+  });
+
+  var findOR = function (i) {
+    if (!orParents[i]) return undefined;
+    if (orParents[i] === i) return i;
+    orParents[i] = findOR(orParents[i]);
+    return orParents[i];
+  };
+
+  var unionOR = function (i, j) {
+    var rootI = findOR(i);
+    var rootJ = findOR(j);
+    if (rootI && rootJ) {
+      orParents[rootI] = rootJ;
+    }
+  };
+
+  if (state.orLinks && state.orLinks.length > 0) {
+    state.orLinks.forEach(function (link) {
+      unionOR(`${link.from.nodeId}_${link.from.attr}`, `${link.to.nodeId}_${link.to.attr}`);
+    });
+  }
+
+  var orGroups = {};
+  Object.keys(predQueriesMap).forEach(function (key) {
+    var root = findOR(key) || key;
+    if (!orGroups[root]) orGroups[root] = [];
+    orGroups[root].push(predQueriesMap[key]);
+  });
+
+  Object.keys(orGroups).forEach(function (root) {
+    var group = orGroups[root];
+    if (group.length === 1) {
+      allPredsArr.push(group[0]);
+    } else if (group.length > 1) {
+      allPredsArr.push(`(${group.join(' OR ')})`);
+    }
+  });
   var allRsQueries = [];
   var joinNodes = state.nodes.filter(n => n.data.isJoin);
   console.log("HHH",state.predicateLinks)

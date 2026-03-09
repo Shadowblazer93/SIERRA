@@ -10,7 +10,13 @@ const initialState = {
   predDisplayStatus: 'FULL',
   modalVisible: '',
   linkingPredicate: null,
-  predicateLinks: []
+  predicateLinks: [],
+  linkingOR: null,
+  orLinks: [],
+  andLinks: [],
+  dnfMode: false,
+  dnfHovering: false,
+  dnfHoverCount: 0
 };
 
 const Store = ({ children }) => {

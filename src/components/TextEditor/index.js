@@ -1,4 +1,4 @@
-import React, {useContext, useState} from 'react';
+import React, {useContext, useEffect, useMemo, useState} from 'react';
 import { Button, Typography, message } from 'antd';
 import {CopyOutlined} from '@ant-design/icons'
 import { BsArrowsAngleExpand } from 'react-icons/bs';
@@ -11,9 +11,17 @@ import { useStoreState } from 'react-flow-renderer';
 import './index.css';
 import { resetCurAvailId, undoResetNodeId } from '../../utils/getNodeId';
 import useVisualActions from '../../hooks/useVisualActions';
-import {PRED_COLOR_V2} from '../../constants'
+import { PRED_COLOR_V2 } from '../../constants';
+import {
+  extractWhereClause,
+  tokenizeBooleanExpr,
+  parseBooleanExpr,
+  toDNF,
+  formatDNF
+} from '../../utils/dnfGraph';
 
 const { Title } = Typography
+
 
 export default function({text}){
   const [state, dispatch] = useContext(Context);
@@ -22,6 +30,20 @@ export default function({text}){
   const [innerText, setInnerText] = useState(text)
   const [showQuery, setShowQuery] = useState(false);
   const [dimensions, setDimensions] = useState({ width: 490, height: 280 });
+  const [dnfOutput, setDnfOutput] = useState('');
+  const [activeQueryView, setActiveQueryView] = useState('CYPHER');
+
+  useEffect(() => {
+    setInnerText(text || '');
+  }, [text]);
+
+  const cypherSource = innerText || text || '';
+  const whereClause = useMemo(() => extractWhereClause(cypherSource), [cypherSource]);
+  const hasMixedBoolean = useMemo(() => {
+    if (!whereClause) return false;
+    return /\bAND\b/i.test(whereClause) && /\bOR\b/i.test(whereClause);
+  }, [whereClause]);
+  const showDnfToggle = hasMixedBoolean || activeQueryView === 'DNF';
 
   const onCopy = () => {
     if(innerText){
@@ -54,6 +76,27 @@ export default function({text}){
 
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
+  };
+
+  const handleToggleQueryView = () => {
+    if (activeQueryView === 'DNF') {
+      setActiveQueryView('CYPHER');
+      return;
+    }
+    if (!whereClause) {
+      message.warning('No WHERE clause found to convert.');
+      return;
+    }
+    try {
+      const tokens = tokenizeBooleanExpr(whereClause);
+      const ast = parseBooleanExpr(tokens);
+      const dnfTerms = toDNF(ast);
+      const formatted = formatDNF(dnfTerms);
+      setDnfOutput(formatted);
+      setActiveQueryView('DNF');
+    } catch (error) {
+      message.error(error.message || 'Failed to convert WHERE clause to DNF.');
+    }
   };
 
 
@@ -229,6 +272,20 @@ export default function({text}){
                 margin: '7px 8px 0px auto'
               }}
             />
+            {showDnfToggle && (
+              <Button
+                style={{
+                  fontSize: 13,
+                  height: 30,
+                  borderRadius: 4,
+                  marginRight: 8
+                }}
+                type="default"
+                onClick={handleToggleQueryView}
+              >
+                {activeQueryView === 'DNF' ? 'Show Cypher' : 'Show DNF'}
+              </Button>
+            )}
             <Button
               style={{
                 fontSize: 13,
@@ -242,11 +299,15 @@ export default function({text}){
             </Button>
           </div>
           <CodeMirror
-            value={text}
+            key={activeQueryView}
+            value={activeQueryView === 'DNF' ? dnfOutput : cypherSource}
             height={`${dimensions.height - 80}px`}
             extensions={[StreamLanguage.define(cypher)]}
+            readOnly={activeQueryView === 'DNF'}
             onChange={(value) => {
-              setInnerText(value);
+              if (activeQueryView === 'CYPHER') {
+                setInnerText(value);
+              }
             }}
           />
           <div

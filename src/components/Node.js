@@ -23,17 +23,36 @@ function Node(props) {
   const [propData, setPropData] = useState([]);
   const [hoveredPredicate, setHoveredPredicate] = useState(null);
   const [nodeHovered, setNodeHovered] = useState(false);
+  const dnfHoverEnterTimeout = useRef(null);
+  const dnfHoverLeaveTimeout = useRef(null);
+  const dnfHoverActive = useRef(false);
   const predicates = props.data.predicates ?? {};
 
   const dnfRows = (props.data.dnf || []).filter(r => r.predicates && r.predicates.length > 0);
   const hasPredicates = Object.keys(predicates).length > 0;
   const hasDNF = dnfRows.length > 0;
   const displayRadius = (hasDNF && !hasPredicates) ? props.data.radius + 15 : props.data.radius;
+  const nodeOpacity = (state.dnfMode && !state.dnfHovering && props.data.dnfParticipates) ? 0.65 : 1;
 
   useEffect(async () => {
     const propValues = await api.fetchPropertyValues(props.data.label);
     setPropData(propValues);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (dnfHoverEnterTimeout.current) {
+        clearTimeout(dnfHoverEnterTimeout.current);
+      }
+      if (dnfHoverLeaveTimeout.current) {
+        clearTimeout(dnfHoverLeaveTimeout.current);
+      }
+      if (dnfHoverActive.current) {
+        dnfHoverActive.current = false;
+        dispatch({ type: 'DNF_HOVER_END' });
+      }
+    };
+  }, [dispatch]);
 
   //* for distinguishing drag and click
   const mousePos = useRef(null)
@@ -196,6 +215,34 @@ function Node(props) {
         return(<div />)
     }
   }
+
+  const scheduleDnfHoverStart = () => {
+    if (!state.dnfMode || !props.data.dnfParticipates) return;
+    if (dnfHoverActive.current) return;
+    if (dnfHoverLeaveTimeout.current) {
+      clearTimeout(dnfHoverLeaveTimeout.current);
+    }
+    if (dnfHoverEnterTimeout.current) {
+      clearTimeout(dnfHoverEnterTimeout.current);
+    }
+    dnfHoverActive.current = true;
+    dispatch({ type: 'DNF_HOVER_START' });
+  };
+
+  const scheduleDnfHoverEnd = () => {
+    if (!state.dnfMode || !props.data.dnfParticipates) return;
+    if (!dnfHoverActive.current) return;
+    if (dnfHoverEnterTimeout.current) {
+      clearTimeout(dnfHoverEnterTimeout.current);
+    }
+    if (dnfHoverLeaveTimeout.current) {
+      clearTimeout(dnfHoverLeaveTimeout.current);
+    }
+    dnfHoverLeaveTimeout.current = setTimeout(() => {
+      dnfHoverActive.current = false;
+      dispatch({ type: 'DNF_HOVER_END' });
+    }, 2000);
+  };
   return (
     <div style={{ position: 'relative', width: `${displayRadius * 2}px`, height: `${displayRadius * 2}px` }}>
       {/* Node */}
@@ -209,13 +256,21 @@ function Node(props) {
             handleClick(e);
           }
         }}
-        onMouseEnter={() => setNodeHovered(true)}
-        onMouseLeave={() => setNodeHovered(false)}
+        onMouseEnter={() => {
+          setNodeHovered(true);
+          scheduleDnfHoverStart();
+        }}
+        onMouseLeave={() => {
+          setNodeHovered(false);
+          scheduleDnfHoverEnd();
+        }}
         style={{
           background: props.data.color,
           height: `${displayRadius * 2}px`,
           width: `${displayRadius * 2}px`,
           border: props.data.isBold ? '2px solid rgba(47, 47, 47, 0.4)' : '',
+          opacity: nodeOpacity,
+          transition: 'opacity 320ms ease',
           position: 'absolute',
           left: 0,
           top: 0,
@@ -298,6 +353,12 @@ function Node(props) {
         const isLinking = state.linkingPredicate &&
           state.linkingPredicate.nodeId === props.id &&
           state.linkingPredicate.attr === attr;
+        const isLinkingOR = state.linkingOR &&
+          state.linkingOR.nodeId === props.id &&
+          state.linkingOR.attr === attr;
+        const handleBorder = isHovered || isLinking
+          ? '4px solid rgba(255, 255, 255, 0.4)'
+          : (isLinkingOR ? '2px dashed #ff8c00' : '2px solid transparent');
         return (
           <React.Fragment key={attr}>
             {/* Show label above bubble if hovered */}
@@ -333,7 +394,7 @@ function Node(props) {
                 zIndex: 10,
                 pointerEvents: 'none',
                 cursor: 'pointer',
-                border: isHovered || isLinking ? '2px solid #800080' : '0px solid black',
+                border: isHovered || isLinking ? '2px solid #800080' : (isLinkingOR ? '2px dashed #ff8c00' : '0px solid black'),
               }}
               onClick={() => handlePredicateClick(attr, circle)}
             />
@@ -350,13 +411,19 @@ function Node(props) {
                 height: 16,
                 pointerEvents: 'all',
                 zIndex: 30,
-                border: isHovered || isLinking ? '2px solid #800080' : '2px solid transparent',
+                border: handleBorder,
                 transition: 'border 0.2s ease',
                 clipPath: 'polygon(0 50%, 100% 50%, 100% 100%, 0 100%)',
               }}
               isConnectable={true}
-              onMouseEnter={() => setHoveredPredicate(attr)}
-              onMouseLeave={() => setHoveredPredicate(null)}
+              onMouseEnter={() => {
+                setHoveredPredicate(attr);
+                scheduleDnfHoverStart();
+              }}
+              onMouseLeave={() => {
+                setHoveredPredicate(null);
+                scheduleDnfHoverEnd();
+              }}
             />
             <Handle
               type="target"
@@ -371,13 +438,19 @@ function Node(props) {
                 height: 16,
                 pointerEvents: 'all',
                 zIndex: 40,
-                border: isHovered || isLinking ? '2px solid #800080' : '2px solid transparent',
+                border: handleBorder,
                 clipPath: 'polygon(0 0, 100% 0, 100% 50%, 0 50%)',
                 transition: 'border 0.2s ease'
               }}
               isConnectable={true}
-              onMouseEnter={() => setHoveredPredicate(attr)}
-              onMouseLeave={() => setHoveredPredicate(null)}
+              onMouseEnter={() => {
+                setHoveredPredicate(attr);
+                scheduleDnfHoverStart();
+              }}
+              onMouseLeave={() => {
+                setHoveredPredicate(null);
+                scheduleDnfHoverEnd();
+              }}
             />
           </React.Fragment>
         );

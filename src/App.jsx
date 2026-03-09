@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
 import Node from './components/Node';
 import ReactFlow, { Controls, isEdge, addEdge, removeElements, Background, useStoreState, ReactFlowProvider } from 'react-flow-renderer';
 import NewNodeDrawButton from './components/NewNodeDrawButton';
@@ -10,6 +10,8 @@ import SearchResults from './components/SearchResults';
 import { Context } from './Store';
 import CustomEdge from './components/CustomEdge';
 import PredicateLinkEdge from './components/PredicateLinkEdge';
+import OrLinkEdge from './components/OrLinkEdge';
+import AndLinkEdge from './components/AndLinkEdge';
 import PredicateLinkModal from './components/PredicateLinkModal';
 import ConfirmationAlert from './components/ConfirmationAlert';
 import {Button, Spin, Select, Modal, Form, Input} from 'antd';
@@ -19,6 +21,7 @@ import { getNodeId } from './utils/getNodeId';
 import useVisualActions from './hooks/useVisualActions'
 import JoinGraphView from './components/JoinGraphView';
 import QueryControls from './components/QueryControls';
+import { buildDnfAndLinksFromQuery } from './utils/dnfGraph';
 const neo4jApi = require('./neo4jApi')
 const pkg = require('../package.json')
 
@@ -35,6 +38,15 @@ function App() {
   const [selectedLink, setSelectedLink] = useState(null);
   const [cypherQuery, setCypherQuery] = useState('');
   const [databaseSource, setDatabaseSource] = useState('northwind');
+  const connectModeRef = useRef('join');
+  const pendingOrRef = useRef(false);
+  const orGroupColorsRef = useRef({});
+  const [orGroupModalVisible, setOrGroupModalVisible] = useState(false);
+  const [activeOrGroupId, setActiveOrGroupId] = useState(null);
+  const lastDnfSignatureRef = useRef('');
+  const dnfHoverResetTimer = useRef(null);
+  const lastDnfModeRef = useRef(false);
+  const dnfActivationTimer = useRef(null);
   
   const [queryOptions, setQueryOptions] = useState({
     limit: '',
@@ -47,6 +59,95 @@ function App() {
 
   const [connectModalVisible, setConnectModalVisible] = useState(false);
   const [form] = Form.useForm();
+
+  const getOrGroupColor = (groupId) => {
+    if (!groupId) return '#ff8c00';
+    if (!orGroupColorsRef.current[groupId]) {
+      const randomChannel = () => 80 + Math.floor(Math.random() * 150);
+      const toHex = (value) => value.toString(16).padStart(2, '0');
+      const r = randomChannel();
+      const g = randomChannel();
+      const b = randomChannel();
+      orGroupColorsRef.current[groupId] = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    }
+    return orGroupColorsRef.current[groupId];
+  };
+
+  const orGroupRoots = useMemo(() => {
+    const orLinks = state.orLinks || [];
+    const parents = {};
+    const ensure = (key) => {
+      if (!parents[key]) parents[key] = key;
+    };
+    const find = (key) => {
+      if (!parents[key]) return undefined;
+      if (parents[key] === key) return key;
+      parents[key] = find(parents[key]);
+      return parents[key];
+    };
+    const union = (a, b) => {
+      const rootA = find(a);
+      const rootB = find(b);
+      if (rootA && rootB && rootA !== rootB) {
+        parents[rootA] = rootB;
+      }
+    };
+
+    orLinks.forEach((link) => {
+      const fromKey = `${link.from.nodeId}_${link.from.attr}`;
+      const toKey = `${link.to.nodeId}_${link.to.attr}`;
+      ensure(fromKey);
+      ensure(toKey);
+      union(fromKey, toKey);
+    });
+
+    const rootByKey = {};
+    Object.keys(parents).forEach((key) => {
+      rootByKey[key] = find(key) || key;
+    });
+    return rootByKey;
+  }, [state.orLinks]);
+
+  const getOrGroupPredicateKeys = (groupId) => {
+    if (!groupId) return [];
+    return Object.keys(orGroupRoots).filter((key) => orGroupRoots[key] === groupId);
+  };
+
+  const getPredicateLabel = (nodeId, attr) => {
+    const node = (state.nodes || []).find((n) => String(n.id) === String(nodeId));
+    const nodeLabel = node?.data?.label || node?.data?.rep || nodeId;
+    return `${nodeLabel}.${attr}`;
+  };
+
+  const orGroupPredicates = useMemo(() => {
+    const keys = getOrGroupPredicateKeys(activeOrGroupId);
+    return keys.map((key) => {
+      const [nodeId, ...attrParts] = key.split('_');
+      const attr = attrParts.join('_');
+      return {
+        key,
+        nodeId,
+        attr,
+        label: getPredicateLabel(nodeId, attr)
+      };
+    });
+  }, [activeOrGroupId, orGroupRoots, state.nodes]);
+
+  useEffect(() => {
+    if (orGroupModalVisible && orGroupPredicates.length === 0) {
+      setOrGroupModalVisible(false);
+      setActiveOrGroupId(null);
+    }
+  }, [orGroupModalVisible, orGroupPredicates.length]);
+
+  useEffect(() => {
+    const activeGroups = new Set(Object.values(orGroupRoots));
+    Object.keys(orGroupColorsRef.current).forEach((groupId) => {
+      if (!activeGroups.has(groupId)) {
+        delete orGroupColorsRef.current[groupId];
+      }
+    });
+  }, [orGroupRoots]);
   
   const handleDatabaseChange = (value) => {
     if (value === 'connect-database') {
@@ -127,6 +228,94 @@ function App() {
   }, [state, queryOptions])
 
   useEffect(() => {
+    if (!cypherQuery || !state.nodes || state.nodes.length === 0) return;
+    let dnfInfo;
+    try {
+      dnfInfo = buildDnfAndLinksFromQuery(cypherQuery, state.nodes);
+    } catch (error) {
+      dnfInfo = {
+        andLinks: [],
+        participatingNodeIds: new Set(),
+        dnfTermsCount: 0,
+        hasMixedBoolean: false
+      };
+    }
+
+    const participatingList = Array.from(dnfInfo.participatingNodeIds).sort();
+    const signature = JSON.stringify({
+      andLinks: dnfInfo.andLinks,
+      dnfTermsCount: dnfInfo.dnfTermsCount,
+      participating: participatingList
+    });
+
+    if (signature === lastDnfSignatureRef.current) return;
+    lastDnfSignatureRef.current = signature;
+
+    const updatedNodes = state.nodes.map((node) => {
+      const participates = dnfInfo.participatingNodeIds.has(node.id);
+      if (node?.data?.dnfParticipates === participates) return node;
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          dnfParticipates: participates
+        }
+      };
+    });
+
+    const nextDnfMode = dnfInfo.hasMixedBoolean && dnfInfo.dnfTermsCount > 0;
+    const activateDnfMode = nextDnfMode && !lastDnfModeRef.current;
+    lastDnfModeRef.current = nextDnfMode;
+
+    if (dnfActivationTimer.current) {
+      clearTimeout(dnfActivationTimer.current);
+      dnfActivationTimer.current = null;
+    }
+
+    if (activateDnfMode) {
+      dnfActivationTimer.current = setTimeout(() => {
+        dispatch({ type: 'RESET_DNF_HOVER' });
+      }, 1200);
+    }
+
+    dispatch({
+      type: 'SET_GRAPH',
+      payload: {
+        ...state,
+        nodes: updatedNodes,
+        edges: state.edges,
+        andLinks: dnfInfo.andLinks,
+        dnfMode: nextDnfMode,
+        dnfHoverCount: activateDnfMode ? 1 : 0
+      }
+    });
+  }, [cypherQuery, state.nodes, state.edges]);
+
+  useEffect(() => {
+    const handleContextMenu = (e) => e.preventDefault();
+    document.addEventListener('contextmenu', handleContextMenu);
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, []);
+
+  const scheduleDnfHoverReset = () => {
+    if (dnfHoverResetTimer.current) {
+      clearTimeout(dnfHoverResetTimer.current);
+    }
+    dnfHoverResetTimer.current = setTimeout(() => {
+      dispatch({ type: 'RESET_DNF_HOVER' });
+    }, 2000);
+  };
+
+  const cancelDnfHoverReset = () => {
+    if (dnfHoverResetTimer.current) {
+      clearTimeout(dnfHoverResetTimer.current);
+      dnfHoverResetTimer.current = null;
+    }
+  };
+
+  useEffect(() => {
     async function fetchData() {
       let result = await api.setUp();
       let props = await api.getProperties(result.entities);
@@ -191,16 +380,65 @@ function App() {
     _internalDispatchGraph(graph)
   };
 
+  const onConnectStart = (event, params) => {
+    const isRightClick = event && event.button === 2;
+    connectModeRef.current = isRightClick ? 'or' : 'join';
+    pendingOrRef.current = isRightClick;
+    if (isRightClick && params && params.nodeId && params.handleId) {
+      dispatch({
+        type: 'SET_LINKING_OR',
+        payload: { nodeId: params.nodeId, attr: params.handleId }
+      });
+    } else {
+      dispatch({
+        type: 'SET_LINKING_OR',
+        payload: null
+      });
+    }
+  };
+
+  const onConnectStop = () => {
+    if (pendingOrRef.current) {
+      setTimeout(() => {
+        if (pendingOrRef.current) {
+          dispatch({
+            type: 'SET_LINKING_OR',
+            payload: null
+          });
+          connectModeRef.current = 'join';
+          pendingOrRef.current = false;
+        }
+      }, 0);
+    }
+  };
+
   const onConnect = (params) => {
     console.log("HANDLE CONNECTION",params)
     if (params.sourceHandle && params.targetHandle) {
+      const isOrConnect = connectModeRef.current === 'or' || pendingOrRef.current;
+      if (isOrConnect) {
+        dispatch({
+          type: 'ADD_OR_LINK',
+          payload: {
+            from: { nodeId: params.source, attr: params.sourceHandle },
+            to:   { nodeId: params.target, attr: params.targetHandle }
+          }
+        });
+      } else {
+        dispatch({
+          type: 'ADD_PREDICATE_LINK',
+          payload: {
+            from: { nodeId: params.source, attr: params.sourceHandle },
+            to:   { nodeId: params.target, attr: params.targetHandle }
+          }
+        });
+      }
       dispatch({
-        type: 'ADD_PREDICATE_LINK',
-        payload: {
-          from: { nodeId: params.source, attr: params.sourceHandle },
-          to:   { nodeId: params.target, attr: params.targetHandle }
-        }
+        type: 'SET_LINKING_OR',
+        payload: null
       });
+      connectModeRef.current = 'join';
+      pendingOrRef.current = false;
       return; // don't fall through to normal node-edge logic
     }
 
@@ -279,6 +517,68 @@ function App() {
           operator: link.operator,
           joinType: link.joinType,
           onLinkClick: handleLinkClick
+        }
+      }))
+    : [];
+
+  const handleOrGroupOpen = (event, groupId) => {
+    event.stopPropagation();
+    setActiveOrGroupId(groupId);
+    setOrGroupModalVisible(true);
+  };
+
+  const handleRemovePredicateFromOrGroup = (nodeId, attr) => {
+    const linksToRemove = (state.orLinks || []).filter((link) =>
+      (String(link.from.nodeId) === String(nodeId) && link.from.attr === attr) ||
+      (String(link.to.nodeId) === String(nodeId) && link.to.attr === attr)
+    );
+
+    linksToRemove.forEach((link) => {
+      dispatch({ type: 'DELETE_OR_LINK', payload: link });
+    });
+  };
+
+  const showDnfLinks = state.dnfMode && !state.dnfHovering;
+  const andOpacity = showDnfLinks ? 1 : 0;
+  const orOpacity = showDnfLinks ? 0 : 1;
+
+  const orLinkElements = (state.orLinks || []).length > 0
+    ? state.orLinks.map((link, idx) => {
+        const fromKey = `${link.from.nodeId}_${link.from.attr}`;
+        const toKey = `${link.to.nodeId}_${link.to.attr}`;
+        const groupId = orGroupRoots[fromKey] || orGroupRoots[toKey] || fromKey;
+        const groupColor = getOrGroupColor(groupId);
+        return {
+          id: `or-link-${idx}`,
+          source: link.from.nodeId,
+          target: link.to.nodeId,
+          sourceHandle: link.from.attr,
+          targetHandle: link.to.attr,
+          type: 'orLink',
+          data: {
+            fromAttr: link.from.attr,
+            toAttr: link.to.attr,
+            orGroupId: groupId,
+            orGroupColor: groupColor,
+            onOrTextClick: handleOrGroupOpen,
+            opacity: orOpacity
+          }
+        };
+      })
+    : [];
+
+  const andLinkElements = (state.andLinks || []).length > 0
+    ? state.andLinks.map((link, idx) => ({
+        id: `and-link-${idx}`,
+        source: link.from.nodeId,
+        target: link.to.nodeId,
+        sourceHandle: link.from.attr,
+        targetHandle: link.to.attr,
+        type: 'andLink',
+        data: {
+          groupId: link.groupId,
+          color: link.color,
+          opacity: andOpacity
         }
       }))
     : [];
@@ -367,6 +667,46 @@ function App() {
             </div>
           </div>
 
+          <Modal
+            title="OR Group Predicates"
+            visible={orGroupModalVisible}
+            onCancel={() => {
+              setOrGroupModalVisible(false);
+              setActiveOrGroupId(null);
+            }}
+            footer={null}
+          >
+            {orGroupPredicates.length === 0 ? (
+              <div style={{ color: '#888' }}>No predicates in this OR group.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {orGroupPredicates.map((pred) => (
+                  <div
+                    key={pred.key}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      padding: '6px 8px',
+                      border: '1px solid #eee',
+                      borderRadius: 6
+                    }}
+                  >
+                    <span style={{ fontWeight: 600 }}>{pred.label}</span>
+                    <Button
+                      danger
+                      size="small"
+                      onClick={() => handleRemovePredicateFromOrGroup(pred.nodeId, pred.attr)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Modal>
+
           <JoinGraphView onEditLink={handleEditLink} />
           <QueryControls 
             options={queryOptions} 
@@ -387,7 +727,7 @@ function App() {
                       isBold: n.isBold
                     }
                   })
-                ).concat(
+                ).concat(andLinkElements).concat(
                   state.edges.map(e => {
                     const sourceNode = state.nodes.find(n => n.id === e.source);
                     const targetNode = state.nodes.find(n => n.id === e.target);
@@ -401,11 +741,11 @@ function App() {
                       }
                     };
                   })
-                ).concat(predicateLinkElements)
+                ).concat(predicateLinkElements).concat(orLinkElements)
               }
               style={{ width: '100%', height: '100vh' }}
               nodeTypes={{ special: Node }}
-              edgeTypes={{ custom: CustomEdge, predicateLink: PredicateLinkEdge }}
+              edgeTypes={{ custom: CustomEdge, predicateLink: PredicateLinkEdge, orLink: OrLinkEdge, andLink: AndLinkEdge }}
               onElementsRemove={(elementsToRemove) =>
                 setToastInfo({
                   show: true,
@@ -414,6 +754,10 @@ function App() {
                 })
               }
               onConnect={onConnect}
+              onConnectStart={onConnectStart}
+              onConnectStop={onConnectStop}
+              onPaneMouseLeave={scheduleDnfHoverReset}
+              onPaneMouseEnter={cancelDnfHoverReset}
             >
               <Controls className='controls-custom' />
               <Background

@@ -70,6 +70,9 @@ function CustomEdge({
   const [propData, setPropData] = useState([]);
   const [cardinalityModalVisible, setCardinalityModalVisible] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const dnfHoverEnterTimeout = useRef(null);
+  const dnfHoverLeaveTimeout = useRef(null);
+  const dnfHoverActive = useRef(false);
 
   const edgePath = `M ${sourceX}, ${sourceY}L ${targetX}, ${targetY}`
   const markerEnd = getMarkerEnd(directed === true ? arrowHeadType : '', markerEndId);
@@ -77,6 +80,34 @@ function CustomEdge({
   const predicates = data.predicates ?? {}
   const {rs, cardinality, isPath, cardinalityProps} = data
   const isDirected = arrowHeadType === "arrowclosed"
+
+  const scheduleDnfHoverStart = () => {
+    if (!state.dnfMode) return;
+    if (dnfHoverActive.current) return;
+    if (dnfHoverLeaveTimeout.current) {
+      clearTimeout(dnfHoverLeaveTimeout.current);
+    }
+    if (dnfHoverEnterTimeout.current) {
+      clearTimeout(dnfHoverEnterTimeout.current);
+    }
+    dnfHoverActive.current = true;
+    dispatch({ type: 'DNF_HOVER_START' });
+  };
+
+  const scheduleDnfHoverEnd = () => {
+    if (!state.dnfMode) return;
+    if (!dnfHoverActive.current) return;
+    if (dnfHoverEnterTimeout.current) {
+      clearTimeout(dnfHoverEnterTimeout.current);
+    }
+    if (dnfHoverLeaveTimeout.current) {
+      clearTimeout(dnfHoverLeaveTimeout.current);
+    }
+    dnfHoverLeaveTimeout.current = setTimeout(() => {
+      dnfHoverActive.current = false;
+      dispatch({ type: 'DNF_HOVER_END' });
+    }, 2000);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -92,6 +123,21 @@ function CustomEdge({
     }
 
   }, [rs])
+
+  useEffect(() => {
+    return () => {
+      if (dnfHoverEnterTimeout.current) {
+        clearTimeout(dnfHoverEnterTimeout.current);
+      }
+      if (dnfHoverLeaveTimeout.current) {
+        clearTimeout(dnfHoverLeaveTimeout.current);
+      }
+      if (dnfHoverActive.current) {
+        dnfHoverActive.current = false;
+        dispatch({ type: 'DNF_HOVER_END' });
+      }
+    };
+  }, [dispatch]);
 
   const setModalVisible = (bool) => {
     dispatch({
@@ -299,6 +345,12 @@ function CustomEdge({
 
   return (
     <>
+      <path
+        d={edgePath}
+        style={{ stroke: 'transparent', strokeWidth: 10 }}
+        onMouseEnter={scheduleDnfHoverStart}
+        onMouseLeave={scheduleDnfHoverEnd}
+      />
       <path
         id={id}
         style={style}

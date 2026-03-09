@@ -280,7 +280,7 @@ const NodePredicateModal = ({
 
                       {agg.attribute && ['SUM', 'AVG'].includes(agg.function) && !isNumeric(agg.attribute) && (
                           <div style={{color: 'red', fontSize: '12px', marginTop: 4}}>
-                              Warning: Applying numeric aggregation to non-numeric type
+                              Warning: Numeric aggregation on non-numeric type!
                           </div>
                       )}
                    </div>

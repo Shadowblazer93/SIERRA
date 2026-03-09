@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Input, Switch, Select, Space, Typography, Divider, Row, Col } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined, RetweetOutlined, PlusOutlined, DeleteOutlined, DragOutlined, EyeInvisibleOutlined, EditOutlined } from '@ant-design/icons';
+import { Button, Input, Switch, Select, Space, Typography, Divider, Row, Col, Modal } from 'antd';
+import { ArrowUpOutlined, ArrowDownOutlined, RetweetOutlined, PlusOutlined, DeleteOutlined, DragOutlined, EyeInvisibleOutlined, EditOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import './index.css';
 
 const { Text } = Typography;
@@ -17,6 +17,7 @@ const QueryControls = ({ options, onOptionsChange }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [visible, setVisible] = useState(false);
+  const [legendVisible, setLegendVisible] = useState(false);
 
   // Array management for WITH and ORDER BY
   const [withClauses, setWithClauses] = useState(options.withClauses || []);
@@ -122,14 +123,85 @@ const QueryControls = ({ options, onOptionsChange }) => {
                 zIndex: 1000
             }}
         >
-            <Button 
-                type="primary" 
-                shape="default" 
-                icon={<EditOutlined />} 
-                size="middle"
-                onClick={() => setVisible(true)}
-                style={{ cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
-            />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <Button 
+                  type="primary" 
+                  shape="default" 
+                  icon={<EditOutlined />} 
+                  size="middle"
+                  onClick={() => setVisible(true)}
+                  style={{ cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+              />
+              <Button
+                  type="default"
+                  shape="default"
+                  icon={<InfoCircleOutlined />}
+                  size="middle"
+                  onClick={() => setLegendVisible(true)}
+                  style={{ cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+              />
+            </div>
+            <Modal
+              title="Graph Legend"
+              visible={legendVisible}
+              onCancel={() => setLegendVisible(false)}
+              footer={null}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <svg width="140" height="16">
+                    <line
+                      x1="4"
+                      y1="8"
+                      x2="136"
+                      y2="8"
+                      stroke="#7a3fb2"
+                      strokeWidth="2"
+                      strokeDasharray="4 4"
+                    />
+                  </svg>
+                  <Text>Join</Text>
+                  <code style={{ background: '#f0f0f0', borderRadius: 4, fontSize: 12 }}>a.x = b.y</code>
+                  <Text>(Left click)</Text>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <svg width="140" height="16" viewBox="0 0 140 16">
+                    <defs>
+                      <linearGradient id="legend-or" gradientUnits="userSpaceOnUse" x1="4" y1="8" x2="136" y2="8">
+                        <stop offset="0%" stopColor="#ebfcff" />
+                        <stop offset="100%" stopColor="#407c96" />
+                      </linearGradient>
+                    </defs>
+                    <line
+                      x1="4"
+                      y1="8"
+                      x2="136"
+                      y2="8"
+                      stroke="url(#legend-or)"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <Text>OR</Text>
+                  <code style={{ background: '#f0f0f0', borderRadius: 4, fontSize: 12 }}>a.x OR b.y</code>
+                  <Text>(Right click)</Text>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <svg width="140" height="16" viewBox="0 0 140 16">
+                    <path
+                      d="M 6 4 L 10 8 L 6 12 M 14 4 L 18 8 L 14 12 M 22 4 L 26 8 L 22 12 M 30 4 L 34 8 L 30 12 M 38 4 L 42 8 L 38 12 M 46 4 L 50 8 L 46 12 M 54 4 L 58 8 L 54 12 M 62 4 L 66 8 L 62 12 M 70 4 L 74 8 L 70 12 M 78 4 L 82 8 L 78 12 M 86 4 L 90 8 L 86 12 M 94 4 L 98 8 L 94 12 M 102 4 L 106 8 L 102 12 M 110 4 L 114 8 L 110 12 M 118 4 L 122 8 L 118 12 M 126 4 L 130 8 L 126 12"
+                      stroke="#ea7e20"
+                      strokeWidth="2"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <Text>AND</Text>
+                  <code style={{ background: '#f0f0f0', borderRadius: 4, fontSize: 12 }}>a.x AND b.y</code>
+                </div>
+              </div>
+            </Modal>
         </div>
     );
   }

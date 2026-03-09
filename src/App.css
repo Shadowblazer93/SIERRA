@@ -158,6 +158,18 @@ td {
   border-radius: 8px !important;
 }
 
+.react-flow__edges {
+  z-index: 5;
+}
+
+.react-flow__nodes {
+  z-index: 4;
+}
+
+.and-link-edge {
+  pointer-events: none;
+}
+
 .spinner-layer {
   position: relative;
   width: 140px;

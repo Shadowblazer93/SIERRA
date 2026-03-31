@@ -1,7 +1,15 @@
-import { Drawer, Button, Divider, Typography, Tooltip, Select, Input } from 'antd';
-import {ArrowLeftOutlined, DeleteOutlined, PlusOutlined, FilterOutlined} from '@ant-design/icons'
-import React, {useState, useContext} from 'react';
-import { addEdge } from 'react-flow-renderer';
+import { Drawer, Button, Divider, Typography, Tooltip, Select, Input, Tag } from 'antd';
+import {
+  ArrowLeftOutlined,
+  DeleteOutlined,
+  PlusOutlined,
+  FilterOutlined,
+  LeftOutlined,
+  RightOutlined,
+  DragOutlined,
+  SortAscendingOutlined
+} from '@ant-design/icons';
+import React, {useState, useContext, useMemo, useEffect} from 'react';
 import { PRED_COLOR_V2 } from '../../constants';
 import { Context } from '../../Store';
 import { PredicateDraw, PredicateCheckBox, SelectTag } from '../common';
@@ -11,6 +19,68 @@ import DNFBuilder from './DNFBuilder';
 
 const { Title } = Typography
 
+const NESTING_LEVEL_COLORS = [
+  '#f6ffed',
+  '#e6fffb',
+  '#e6f7ff',
+  '#f9f0ff',
+  '#fff7e6',
+  '#fff1f0'
+];
+
+const normalizePredicateNesting = (predicateNesting, predicateKeys) => {
+  const source = (predicateNesting && typeof predicateNesting === 'object') ? predicateNesting : {};
+  const sourceOrder = Array.isArray(source.order) ? source.order : [];
+  const sourceLevels = (source.levels && typeof source.levels === 'object') ? source.levels : {};
+
+  const keySet = new Set(predicateKeys);
+  const seen = new Set();
+  const normalizedOrder = [];
+
+  sourceOrder.forEach((attr) => {
+    if (!keySet.has(attr) || seen.has(attr)) return;
+    seen.add(attr);
+    normalizedOrder.push(attr);
+  });
+
+  predicateKeys.forEach((attr) => {
+    if (seen.has(attr)) return;
+    seen.add(attr);
+    normalizedOrder.push(attr);
+  });
+
+  const normalizedLevels = {};
+  normalizedOrder.forEach((attr, index) => {
+    const raw = Number.parseInt(sourceLevels[attr], 10);
+    const safeLevel = Number.isFinite(raw) && raw > 0 ? raw : 0;
+    const maxLevel = index === 0 ? 0 : (normalizedLevels[normalizedOrder[index - 1]] + 1);
+    normalizedLevels[attr] = Math.min(safeLevel, maxLevel);
+  });
+
+  return {
+    order: normalizedOrder,
+    levels: normalizedLevels
+  };
+};
+
+const clampLevelsToOrder = (order, levels) => {
+  const clampedLevels = {};
+  order.forEach((attr, index) => {
+    const raw = Number.parseInt(levels[attr], 10);
+    const safeLevel = Number.isFinite(raw) && raw > 0 ? raw : 0;
+    const maxLevel = index === 0 ? 0 : (clampedLevels[order[index - 1]] + 1);
+    clampedLevels[attr] = Math.min(safeLevel, maxLevel);
+  });
+  return clampedLevels;
+};
+
+const moveItem = (arr, fromIndex, toIndex) => {
+  const next = [...arr];
+  const [item] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, item);
+  return next;
+};
+
 const NodePredicateModal = ({
   visible,
   onClose,
@@ -19,6 +89,7 @@ const NodePredicateModal = ({
   targets,
   attributes,
   predicates,
+  predicateNesting,
   aggregations,
   dnf,
   addPredicate,
@@ -32,7 +103,110 @@ const NodePredicateModal = ({
 }) => {
   const VA = useVisualActions()
   const [childrenDrawer, setChildDrawer] = useState({});
+  const [nestingDrawerVisible, setNestingDrawerVisible] = useState(false);
+  const [draggedAttr, setDraggedAttr] = useState('');
+  const [dropTargetAttr, setDropTargetAttr] = useState('');
   const [state, dispatch] = useContext(Context);
+
+  const predicateKeys = Object.keys(predicates || {});
+  const predicateKeySignature = predicateKeys.slice().sort().join('|');
+
+  const normalizedNesting = useMemo(() => {
+    return normalizePredicateNesting(predicateNesting, predicateKeys);
+  }, [predicateNesting, predicateKeySignature]);
+
+  useEffect(() => {
+    if (visible) return;
+    setNestingDrawerVisible(false);
+    setDraggedAttr('');
+    setDropTargetAttr('');
+  }, [visible]);
+
+  const persistNestingState = (nextNestingState) => {
+    dispatch({
+      type: 'MODIFY_NODE_DATA',
+      payload: { node: nodeId, prop: 'predicateNesting', newVal: nextNestingState },
+    });
+  };
+
+  const relationshipMap = useMemo(() => {
+    if (!nestingDrawerVisible) return {};
+
+    const relMap = {};
+    const keySet = new Set(predicateKeys);
+
+    predicateKeys.forEach((attr) => {
+      relMap[attr] = [];
+    });
+
+    (state.orLinks || []).forEach((link) => {
+      const isLocal = String(link.from.nodeId) === String(nodeId) && String(link.to.nodeId) === String(nodeId);
+      if (!isLocal) return;
+      if (!keySet.has(link.from.attr) || !keySet.has(link.to.attr)) return;
+      relMap[link.from.attr] = [...new Set([...(relMap[link.from.attr] || []), link.to.attr])];
+      relMap[link.to.attr] = [...new Set([...(relMap[link.to.attr] || []), link.from.attr])];
+    });
+
+    const orderIndex = {};
+    (normalizedNesting.order || []).forEach((attr, index) => {
+      orderIndex[attr] = index;
+    });
+
+    Object.keys(relMap).forEach((attr) => {
+      relMap[attr] = relMap[attr].sort((a, b) => {
+        const ai = orderIndex[a] ?? Number.MAX_SAFE_INTEGER;
+        const bi = orderIndex[b] ?? Number.MAX_SAFE_INTEGER;
+        return ai - bi;
+      });
+    });
+
+    return relMap;
+  }, [state.orLinks, nodeId, predicateKeySignature, normalizedNesting.order, nestingDrawerVisible]);
+
+  const shiftIndentation = (attr, delta) => {
+    const index = normalizedNesting.order.indexOf(attr);
+    if (index < 0) return;
+
+    const currentLevel = normalizedNesting.levels[attr] || 0;
+    let nextLevel = currentLevel + delta;
+    if (nextLevel < 0) nextLevel = 0;
+
+    if (delta > 0) {
+      if (index === 0) return;
+      const prevAttr = normalizedNesting.order[index - 1];
+      const prevLevel = normalizedNesting.levels[prevAttr] || 0;
+      nextLevel = Math.min(nextLevel, prevLevel + 1);
+    }
+
+    const nextLevels = {
+      ...normalizedNesting.levels,
+      [attr]: nextLevel
+    };
+    const clamped = clampLevelsToOrder(normalizedNesting.order, nextLevels);
+    persistNestingState({ order: normalizedNesting.order, levels: clamped });
+  };
+
+  const handleDropOnAttribute = (targetAttr) => {
+    if (!draggedAttr || draggedAttr === targetAttr) {
+      setDropTargetAttr('');
+      setDraggedAttr('');
+      return;
+    }
+
+    const fromIndex = normalizedNesting.order.indexOf(draggedAttr);
+    const toIndex = normalizedNesting.order.indexOf(targetAttr);
+    if (fromIndex < 0 || toIndex < 0) {
+      setDropTargetAttr('');
+      setDraggedAttr('');
+      return;
+    }
+
+    const reordered = moveItem(normalizedNesting.order, fromIndex, toIndex);
+    const clampedLevels = clampLevelsToOrder(reordered, normalizedNesting.levels);
+    persistNestingState({ order: reordered, levels: clampedLevels });
+    setDropTargetAttr('');
+    setDraggedAttr('');
+  };
 
   const showChildrenDrawer = (attr) => {
     setChildDrawer({
@@ -123,11 +297,20 @@ const NodePredicateModal = ({
         <Divider orientation="left">Selected Predicates</Divider>
 
         <div style={{padding: '0px 15px 10px'}}>
+          <Button
+            style={{ marginBottom: 10 }}
+            block
+            icon={<SortAscendingOutlined />}
+            onClick={() => setNestingDrawerVisible(true)}
+          >
+            Change Nesting
+          </Button>
+
           {Object.keys(predicates).map((attr, i) => {
             const colour = PRED_COLOR_V2[attributes.indexOf(attr) % PRED_COLOR_V2.length]
             return (
               <div key={`pt-${i}`}>
-                <SelectTag onClick={() => {showChildrenDrawer(attr); console.log("YES CLICKED")}} colour={colour.name} key={`${attr}-k`} text={attr} />
+                <SelectTag onClick={() => {showChildrenDrawer(attr);}} colour={colour.name} key={`${attr}-k`} text={attr} />
                 <PredicateDraw
                   onClose={() => onChildrenDrawerClose(attr)}
                   attr={attr}
@@ -341,6 +524,166 @@ const NodePredicateModal = ({
             })
           }
         </div>
+
+        <Drawer
+          title={<Title style={{marginBottom: 0}} level={3}>Change Nesting</Title>}
+          placement="left"
+          closeIcon={<ArrowLeftOutlined/>}
+          maskClosable={false}
+          mask={false}
+          onClose={() => {
+            setNestingDrawerVisible(false);
+            setDraggedAttr('');
+            setDropTargetAttr('');
+          }}
+          visible={nestingDrawerVisible}
+          push={false}
+          width={460}
+        >
+          <div style={{ padding: '0 4px 12px' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1.25fr 1fr 96px',
+                gap: 8,
+                marginBottom: 8,
+                color: '#666',
+                fontSize: 11,
+                fontWeight: 600,
+                textTransform: 'uppercase'
+              }}
+            >
+              <div>Predicate</div>
+              <div>Relationships</div>
+              <div style={{ textAlign: 'right' }}>Nesting</div>
+            </div>
+
+            {normalizedNesting.order.length === 0 && (
+              <div style={{ color: '#888' }}>No predicates available for nesting.</div>
+            )}
+
+            {normalizedNesting.order.map((attr, index) => {
+              const level = normalizedNesting.levels[attr] || 0;
+              const relationAttrs = relationshipMap[attr] || [];
+              const levelColor = NESTING_LEVEL_COLORS[level % NESTING_LEVEL_COLORS.length];
+              const isDropTarget = dropTargetAttr === attr && draggedAttr && draggedAttr !== attr;
+              const canIndentRight = index > 0 && level < ((normalizedNesting.levels[normalizedNesting.order[index - 1]] || 0) + 1);
+
+              return (
+                <div
+                  key={`nest-${attr}`}
+                  draggable
+                  onDragStart={(event) => {
+                    setDraggedAttr(attr);
+                    event.dataTransfer.effectAllowed = 'move';
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    if (draggedAttr && draggedAttr !== attr) {
+                      setDropTargetAttr(attr);
+                    }
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    handleDropOnAttribute(attr);
+                  }}
+                  onDragEnd={() => {
+                    setDraggedAttr('');
+                    setDropTargetAttr('');
+                  }}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1.25fr 1fr 96px',
+                    gap: 8,
+                    alignItems: 'center',
+                    marginBottom: 8,
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: isDropTarget ? '1px dashed #1677ff' : '1px solid #e5e5e5',
+                    background: levelColor,
+                    boxShadow: isDropTarget ? '0 0 0 2px rgba(22, 119, 255, 0.12)' : 'none',
+                    cursor: 'grab'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+                    <DragOutlined style={{ color: '#777', marginRight: 8, flexShrink: 0 }} />
+                    <Tooltip title={`Nesting level ${level}`}>
+                      <span
+                        style={{
+                          width: 18,
+                          height: 18,
+                          minWidth: 18,
+                          borderRadius: '50%',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: '#1f1f1f',
+                          border: '1px solid #bfbfbf',
+                          background: '#fff',
+                          marginRight: 8,
+                          flexShrink: 0
+                        }}
+                      >
+                        {level}
+                      </span>
+                    </Tooltip>
+                    <span style={{
+                      display: 'inline-block',
+                      maxWidth: '100%',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      paddingLeft: `${Math.min(level, 6) * 10}px`,
+                      fontWeight: 600,
+                      color: '#1f1f1f'
+                    }}>
+                      {attr}
+                    </span>
+                  </div>
+
+                  <div style={{ minHeight: 24, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                    {relationAttrs.length > 0 ? (
+                      relationAttrs.map((peerAttr) => (
+                        <Tag key={`${attr}-rel-${peerAttr}`} color="orange" style={{ marginRight: 0 }}>
+                          OR {peerAttr}
+                        </Tag>
+                      ))
+                    ) : (
+                      <span style={{ color: '#595959', fontSize: 12 }}>AND</span>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4 }}>
+                    <Tooltip title="Outdent">
+                      <Button
+                        size="small"
+                        icon={<LeftOutlined />}
+                        disabled={level === 0}
+                        onClick={() => shiftIndentation(attr, -1)}
+                      />
+                    </Tooltip>
+                    <Tooltip title="Indent">
+                      <Button
+                        size="small"
+                        icon={<RightOutlined />}
+                        disabled={!canIndentRight}
+                        onClick={() => shiftIndentation(attr, 1)}
+                      />
+                    </Tooltip>
+                  </div>
+                </div>
+              );
+            })}
+
+            {normalizedNesting.order.length > 0 && (
+              <div style={{ marginTop: 12, color: '#666', fontSize: 12 }}>
+                Drag rows to reorder predicates. Indentation levels add bracket groups in the generated query.
+              </div>
+            )}
+          </div>
+        </Drawer>
 
       </Drawer>
   );

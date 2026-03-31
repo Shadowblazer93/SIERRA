@@ -14,8 +14,8 @@ import OrLinkEdge from './components/OrLinkEdge';
 import AndLinkEdge from './components/AndLinkEdge';
 import PredicateLinkModal from './components/PredicateLinkModal';
 import ConfirmationAlert from './components/ConfirmationAlert';
-import {Button, Spin, Select, Modal, Form, Input} from 'antd';
-import {InfoCircleOutlined, CopyOutlined, LoadingOutlined, ApiOutlined} from '@ant-design/icons'
+import {Button, Spin, Select, Drawer, Modal, Form, Input, Row, Col} from 'antd';
+import {InfoCircleOutlined, CopyOutlined, LoadingOutlined, ApiOutlined, ArrowLeftOutlined} from '@ant-design/icons'
 import Title from 'antd/lib/typography/Title';
 import { getNodeId } from './utils/getNodeId';
 import useVisualActions from './hooks/useVisualActions'
@@ -38,9 +38,12 @@ function App() {
   const [selectedLink, setSelectedLink] = useState(null);
   const [cypherQuery, setCypherQuery] = useState('');
   const [databaseSource, setDatabaseSource] = useState('northwind');
+  const [linkToolMode, setLinkToolMode] = useState('join');
   const connectModeRef = useRef('join');
   const pendingOrRef = useRef(false);
   const orGroupColorsRef = useRef({});
+  const [hoveredOrGroupId, setHoveredOrGroupId] = useState(null);
+  const orGroupHoverTimeout = useRef(null);
   const [orGroupModalVisible, setOrGroupModalVisible] = useState(false);
   const [activeOrGroupId, setActiveOrGroupId] = useState(null);
   const lastDnfSignatureRef = useRef('');
@@ -148,6 +151,14 @@ function App() {
       }
     });
   }, [orGroupRoots]);
+
+  useEffect(() => {
+    return () => {
+      if (orGroupHoverTimeout.current) {
+        clearTimeout(orGroupHoverTimeout.current);
+      }
+    };
+  }, []);
   
   const handleDatabaseChange = (value) => {
     if (value === 'connect-database') {
@@ -264,7 +275,8 @@ function App() {
     });
 
     const nextDnfMode = dnfInfo.hasMixedBoolean && dnfInfo.dnfTermsCount > 0;
-    const activateDnfMode = nextDnfMode && !lastDnfModeRef.current;
+    const allowDnfHover = state.dnfLinksVisible;
+    const activateDnfMode = allowDnfHover && nextDnfMode && !lastDnfModeRef.current;
     lastDnfModeRef.current = nextDnfMode;
 
     if (dnfActivationTimer.current) {
@@ -289,7 +301,7 @@ function App() {
         dnfHoverCount: activateDnfMode ? 1 : 0
       }
     });
-  }, [cypherQuery, state.nodes, state.edges]);
+  }, [cypherQuery, state.nodes, state.edges, state.dnfLinksVisible]);
 
   useEffect(() => {
     const handleContextMenu = (e) => e.preventDefault();
@@ -299,7 +311,19 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    connectModeRef.current = linkToolMode;
+    pendingOrRef.current = false;
+    if (linkToolMode !== 'or') {
+      dispatch({
+        type: 'SET_LINKING_OR',
+        payload: null
+      });
+    }
+  }, [linkToolMode, dispatch]);
+
   const scheduleDnfHoverReset = () => {
+    if (!state.dnfLinksVisible) return;
     if (dnfHoverResetTimer.current) {
       clearTimeout(dnfHoverResetTimer.current);
     }
@@ -309,6 +333,7 @@ function App() {
   };
 
   const cancelDnfHoverReset = () => {
+    if (!state.dnfLinksVisible) return;
     if (dnfHoverResetTimer.current) {
       clearTimeout(dnfHoverResetTimer.current);
       dnfHoverResetTimer.current = null;
@@ -381,10 +406,9 @@ function App() {
   };
 
   const onConnectStart = (event, params) => {
-    const isRightClick = event && event.button === 2;
-    connectModeRef.current = isRightClick ? 'or' : 'join';
-    pendingOrRef.current = isRightClick;
-    if (isRightClick && params && params.nodeId && params.handleId) {
+    connectModeRef.current = linkToolMode;
+    pendingOrRef.current = false;
+    if (linkToolMode === 'or' && params && params.nodeId && params.handleId) {
       dispatch({
         type: 'SET_LINKING_OR',
         payload: { nodeId: params.nodeId, attr: params.handleId }
@@ -405,7 +429,6 @@ function App() {
             type: 'SET_LINKING_OR',
             payload: null
           });
-          connectModeRef.current = 'join';
           pendingOrRef.current = false;
         }
       }, 0);
@@ -415,7 +438,16 @@ function App() {
   const onConnect = (params) => {
     console.log("HANDLE CONNECTION",params)
     if (params.sourceHandle && params.targetHandle) {
-      const isOrConnect = connectModeRef.current === 'or' || pendingOrRef.current;
+      if (connectModeRef.current === 'and') {
+        dispatch({
+          type: 'SET_LINKING_OR',
+          payload: null
+        });
+        pendingOrRef.current = false;
+        return;
+      }
+
+      const isOrConnect = connectModeRef.current === 'or';
       if (isOrConnect) {
         dispatch({
           type: 'ADD_OR_LINK',
@@ -437,7 +469,6 @@ function App() {
         type: 'SET_LINKING_OR',
         payload: null
       });
-      connectModeRef.current = 'join';
       pendingOrRef.current = false;
       return; // don't fall through to normal node-edge logic
     }
@@ -527,6 +558,26 @@ function App() {
     setOrGroupModalVisible(true);
   };
 
+  const handleOrGroupHoverStart = (groupId) => {
+    if (!groupId) return;
+    if (orGroupHoverTimeout.current) {
+      clearTimeout(orGroupHoverTimeout.current);
+      orGroupHoverTimeout.current = null;
+    }
+    setHoveredOrGroupId(groupId);
+  };
+
+  const handleOrGroupHoverEnd = (groupId) => {
+    if (!groupId) return;
+    if (orGroupHoverTimeout.current) {
+      clearTimeout(orGroupHoverTimeout.current);
+    }
+    orGroupHoverTimeout.current = setTimeout(() => {
+      setHoveredOrGroupId((prev) => (prev === groupId ? null : prev));
+      orGroupHoverTimeout.current = null;
+    }, 650);
+  };
+
   const handleRemovePredicateFromOrGroup = (nodeId, attr) => {
     const linksToRemove = (state.orLinks || []).filter((link) =>
       (String(link.from.nodeId) === String(nodeId) && link.from.attr === attr) ||
@@ -538,7 +589,7 @@ function App() {
     });
   };
 
-  const showDnfLinks = state.dnfMode && !state.dnfHovering;
+  const showDnfLinks = state.dnfMode && state.dnfLinksVisible && !state.dnfHovering;
   const andOpacity = showDnfLinks ? 1 : 0;
   const orOpacity = showDnfLinks ? 0 : 1;
 
@@ -546,6 +597,7 @@ function App() {
     ? state.orLinks.map((link, idx) => {
         const fromKey = `${link.from.nodeId}_${link.from.attr}`;
         const toKey = `${link.to.nodeId}_${link.to.attr}`;
+        const isSameNodeGroup = String(link.from.nodeId) === String(link.to.nodeId);
         const groupId = orGroupRoots[fromKey] || orGroupRoots[toKey] || fromKey;
         const groupColor = getOrGroupColor(groupId);
         return {
@@ -561,6 +613,8 @@ function App() {
             orGroupId: groupId,
             orGroupColor: groupColor,
             onOrTextClick: handleOrGroupOpen,
+            isGroupHovering: hoveredOrGroupId === groupId,
+            hideEdgeLabel: isSameNodeGroup,
             opacity: orOpacity
           }
         };
@@ -650,6 +704,24 @@ function App() {
                 </Select>
               </div>
               <NewNodeDrawButton addNode={addNode} />
+              <Select
+                value={linkToolMode}
+                onChange={setLinkToolMode}
+                size="middle"
+                className="link-tool-select"
+                dropdownClassName="link-tool-dropdown"
+                style={{ width: 150, marginLeft: 50 }}
+              >
+                <Select.Option value="join" className="link-tool-option link-tool-join">
+                  Join
+                </Select.Option>
+                <Select.Option value="or" className="link-tool-option link-tool-or">
+                  OR Link
+                </Select.Option>
+                <Select.Option value="and" className="link-tool-option link-tool-and">
+                  AND Link
+                </Select.Option>
+              </Select>
               <PredicateDisplayDropDown value={state.predDisplayStatus} onSelect={_internalDispatchPredDisplayStatus} />
               {/* <UserStudyDatasetDropDown value={userStudyDataset} onSelect={setUserStudyDataset} /> */}
               <Button
@@ -667,14 +739,19 @@ function App() {
             </div>
           </div>
 
-          <Modal
-            title="OR Group Predicates"
-            visible={orGroupModalVisible}
-            onCancel={() => {
+          <Drawer
+            title={<Title style={{ marginBottom: 0 }} level={3}>OR Group Predicates</Title>}
+            placement="left"
+            closeIcon={<ArrowLeftOutlined />}
+            onClose={() => {
               setOrGroupModalVisible(false);
               setActiveOrGroupId(null);
             }}
-            footer={null}
+            visible={orGroupModalVisible}
+            push={false}
+            maskClosable={false}
+            mask={false}
+            width={363}
           >
             {orGroupPredicates.length === 0 ? (
               <div style={{ color: '#888' }}>No predicates in this OR group.</div>
@@ -705,12 +782,23 @@ function App() {
                 ))}
               </div>
             )}
-          </Modal>
+          </Drawer>
 
           <JoinGraphView onEditLink={handleEditLink} />
           <QueryControls 
             options={queryOptions} 
             onOptionsChange={setQueryOptions}
+            dnfLinksVisible={state.dnfLinksVisible}
+            onToggleDnfLinks={(visible) => {
+              dispatch({ type: 'SET_DNF_LINKS_VISIBLE', payload: visible });
+              if (!visible) {
+                dispatch({ type: 'RESET_DNF_HOVER' });
+              }
+            }}
+            dnfAndGroupingEnabled={state.dnfAndGroupingEnabled}
+            onToggleDnfAndGrouping={(enabled) => {
+              dispatch({ type: 'SET_DNF_AND_GROUPING', payload: enabled });
+            }}
           />
           <ReactFlowProvider>
             <CypherTextEditor text={cypherQuery}/>
@@ -724,7 +812,11 @@ function App() {
                       ...n.data,
                       color: n.color,
                       radius: n.radius,
-                      isBold: n.isBold
+                      isBold: n.isBold,
+                      onOrGroupOpen: handleOrGroupOpen,
+                      onOrGroupHoverStart: handleOrGroupHoverStart,
+                      onOrGroupHoverEnd: handleOrGroupHoverEnd,
+                      hoveredOrGroupId
                     }
                   })
                 ).concat(andLinkElements).concat(
@@ -821,6 +913,7 @@ function App() {
               <Form.Item
                 name="uri"
                 label="Connection URI"
+                className="db-uri-field"
                 rules={[{ required: true, message: 'Please input the URI of the database!' }]}
               >
                 <Input addonBefore="bolt+s://" />
@@ -832,20 +925,26 @@ function App() {
               >
                 <Input />
               </Form.Item>
-              <Form.Item
-                name="username"
-                label="Username"
-                rules={[{ required: true, message: 'Please input the username!' }]}
-              >
-                <Input />
-              </Form.Item>
-              <Form.Item
-                name="password"
-                label="Password"
-                rules={[{ required: true, message: 'Please input the password!' }]}
-              >
-                <Input.Password />
-              </Form.Item>
+              <Row gutter={12}>
+                <Col span={12}>
+                  <Form.Item
+                    name="username"
+                    label="Username"
+                    rules={[{ required: true, message: 'Please input the username!' }]}
+                  >
+                    <Input />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    name="password"
+                    label="Password"
+                    rules={[{ required: true, message: 'Please input the password!' }]}
+                  >
+                    <Input.Password />
+                  </Form.Item>
+                </Col>
+              </Row>
             </Form>
           </Modal>
 

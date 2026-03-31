@@ -15,6 +15,8 @@ const initialState = {
   orLinks: [],
   andLinks: [],
   dnfMode: false,
+  dnfLinksVisible: false,
+  dnfAndGroupingEnabled: false,
   dnfHovering: false,
   dnfHoverCount: 0
 };

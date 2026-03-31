@@ -41,6 +41,7 @@ function OrLinkEdge({ id, sourceX, sourceY, targetX, targetY, data }) {
   const [state, dispatch] = useContext(Context);
   const dnfHoverEnterTimeout = useRef(null);
   const dnfHoverLeaveTimeout = useRef(null);
+  const hoverHideTimeout = useRef(null);
   const dnfHoverActive = useRef(false);
   const startY = sourceY + 7;
   const endY = targetY + 7;
@@ -52,6 +53,7 @@ function OrLinkEdge({ id, sourceX, sourceY, targetX, targetY, data }) {
   const gradientStart = adjustColor(color, 0.45);
   const gradientEnd = adjustColor(color, -0.35);
   const opacity = data?.opacity ?? 1;
+  const showLabel = !data?.hideEdgeLabel && (isHovered || !!data?.isGroupHovering);
 
   React.useEffect(() => {
     return () => {
@@ -61,12 +63,33 @@ function OrLinkEdge({ id, sourceX, sourceY, targetX, targetY, data }) {
       if (dnfHoverLeaveTimeout.current) {
         clearTimeout(dnfHoverLeaveTimeout.current);
       }
+      if (hoverHideTimeout.current) {
+        clearTimeout(hoverHideTimeout.current);
+      }
       if (dnfHoverActive.current) {
         dnfHoverActive.current = false;
         dispatch({ type: 'DNF_HOVER_END' });
       }
     };
   }, [dispatch]);
+
+  const beginHover = () => {
+    if (hoverHideTimeout.current) {
+      clearTimeout(hoverHideTimeout.current);
+      hoverHideTimeout.current = null;
+    }
+    setIsHovered(true);
+  };
+
+  const endHover = () => {
+    if (hoverHideTimeout.current) {
+      clearTimeout(hoverHideTimeout.current);
+    }
+    hoverHideTimeout.current = setTimeout(() => {
+      setIsHovered(false);
+      hoverHideTimeout.current = null;
+    }, 180);
+  };
 
   const scheduleDnfHoverStart = () => {
     if (!state.dnfMode) return;
@@ -115,11 +138,11 @@ function OrLinkEdge({ id, sourceX, sourceY, targetX, targetY, data }) {
         d={edgePath}
         style={{ stroke: 'transparent', strokeWidth: 10, cursor: 'default' }}
         onMouseEnter={() => {
-          setIsHovered(true);
+          beginHover();
           scheduleDnfHoverStart();
         }}
         onMouseLeave={() => {
-          setIsHovered(false);
+          endHover();
           scheduleDnfHoverEnd();
         }}
       />
@@ -135,54 +158,56 @@ function OrLinkEdge({ id, sourceX, sourceY, targetX, targetY, data }) {
         className="react-flow__edge-path"
         d={edgePath}
       />
-      <foreignObject
-        width={30}
-        height={24}
-        x={centerX - 15}
-        y={centerY - 12}
-        requiredExtensions="http://www.w3.org/1999/xhtml"
-        style={{
-          overflow: 'visible',
-          pointerEvents: 'auto',
-          opacity: isHovered ? 1 : 0,
-          transition: 'opacity 180ms ease'
-        }}
-        onMouseEnter={() => {
-          setIsHovered(true);
-          scheduleDnfHoverStart();
-        }}
-        onMouseLeave={() => {
-          setIsHovered(false);
-          scheduleDnfHoverEnd();
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%' }}>
-          <div
-            style={{
-              width: 24,
-              height: 18,
-              borderRadius: 6,
-              background: 'white',
-              border: `2px solid ${color}`,
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              color: color,
-              fontWeight: 800,
-              fontSize: 10,
-              boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
-            }}
-            onClick={(event) => {
-              if (data && data.onOrTextClick) {
-                data.onOrTextClick(event, data.orGroupId);
-              }
-            }}
-          >
-            OR
+      {!data?.hideEdgeLabel && (
+        <foreignObject
+          width={30}
+          height={24}
+          x={centerX - 15}
+          y={centerY - 34}
+          requiredExtensions="http://www.w3.org/1999/xhtml"
+          style={{
+            overflow: 'visible',
+            pointerEvents: showLabel ? 'auto' : 'none',
+            opacity: showLabel ? 1 : 0,
+            transition: 'opacity 180ms ease'
+          }}
+          onMouseEnter={() => {
+            beginHover();
+            scheduleDnfHoverStart();
+          }}
+          onMouseLeave={() => {
+            endHover();
+            scheduleDnfHoverEnd();
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', width: '100%' }}>
+            <div
+              style={{
+                width: 24,
+                height: 18,
+                borderRadius: 6,
+                background: 'white',
+                border: `2px solid ${color}`,
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                color: color,
+                fontWeight: 800,
+                fontSize: 10,
+                boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                cursor: 'pointer'
+              }}
+              onClick={(event) => {
+                if (data && data.onOrTextClick) {
+                  data.onOrTextClick(event, data.orGroupId);
+                }
+              }}
+            >
+              OR
+            </div>
           </div>
-        </div>
-      </foreignObject>
+        </foreignObject>
+      )}
     </g>
   );
 }

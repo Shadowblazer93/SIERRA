@@ -6,7 +6,14 @@ import './index.css';
 const { Text } = Typography;
 const { Option } = Select;
 
-const QueryControls = ({ options, onOptionsChange }) => {
+const QueryControls = ({
+  options,
+  onOptionsChange,
+  dnfLinksVisible,
+  onToggleDnfLinks,
+  dnfAndGroupingEnabled,
+  onToggleDnfAndGrouping
+}) => {
   const [limit, setLimit] = useState(options.limit || '');
   const [skip, setSkip] = useState(options.skip || '');
   const [distinct, setDistinct] = useState(options.distinct || false);
@@ -199,6 +206,31 @@ const QueryControls = ({ options, onOptionsChange }) => {
                   </svg>
                   <Text>AND</Text>
                   <code style={{ background: '#f0f0f0', borderRadius: 4, fontSize: 12 }}>a.x AND b.y</code>
+                </div>
+                <Divider style={{ margin: '6px 0' }} />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <Text strong>Show DNF Links</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Toggle AND/OR DNF edges in the graph.
+                    </Text>
+                  </div>
+                  <Switch
+                    checked={!!dnfLinksVisible}
+                    onChange={(checked) => onToggleDnfLinks && onToggleDnfLinks(checked)}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <Text strong>Enable DNF Grouping by AND</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Group AND predicates into halos.
+                    </Text>
+                  </div>
+                  <Switch
+                    checked={!!dnfAndGroupingEnabled}
+                    onChange={(checked) => onToggleDnfAndGrouping && onToggleDnfAndGrouping(checked)}
+                  />
                 </div>
               </div>
             </Modal>

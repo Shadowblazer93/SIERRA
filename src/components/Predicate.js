@@ -19,7 +19,7 @@ function Predicate(props) {
   };
   return (
     <div
-      style={predicateStyle}
+      style={{ ...predicateStyle, ...(props.style || {}) }}
       onClick={props.onClick}
       onMouseEnter={props.onMouseEnter}
       onMouseLeave={props.onMouseLeave}

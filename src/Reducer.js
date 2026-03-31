@@ -169,6 +169,16 @@ const Reducer = (state, action) => {
         dnfHoverCount: 0,
         dnfHovering: false
       };
+    case 'SET_DNF_LINKS_VISIBLE':
+      return {
+        ...state,
+        dnfLinksVisible: action.payload
+      };
+    case 'SET_DNF_AND_GROUPING':
+      return {
+        ...state,
+        dnfAndGroupingEnabled: action.payload
+      };
     case 'ADD_OR_LINK': {
       const newLink = action.payload;
       const exists = (state.orLinks || []).some(link =>

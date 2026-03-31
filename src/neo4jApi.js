@@ -154,12 +154,82 @@ async function getResult(queryString) {
   return result;
 }
 
+const normalizePredicateNesting = (predicateNesting, attrs) => {
+  const source = (predicateNesting && typeof predicateNesting === 'object') ? predicateNesting : {};
+  const sourceOrder = Array.isArray(source.order) ? source.order : [];
+  const sourceLevels = (source.levels && typeof source.levels === 'object') ? source.levels : {};
+
+  const attrSet = new Set(attrs);
+  const seen = new Set();
+  const order = [];
+
+  sourceOrder.forEach((attr) => {
+    if (!attrSet.has(attr) || seen.has(attr)) return;
+    seen.add(attr);
+    order.push(attr);
+  });
+
+  attrs.forEach((attr) => {
+    if (seen.has(attr)) return;
+    seen.add(attr);
+    order.push(attr);
+  });
+
+  const levels = {};
+  order.forEach((attr, index) => {
+    const raw = Number.parseInt(sourceLevels[attr], 10);
+    const safeLevel = Number.isFinite(raw) && raw > 0 ? raw : 0;
+    const maxLevel = index === 0 ? 0 : levels[order[index - 1]] + 1;
+    levels[attr] = Math.min(safeLevel, maxLevel);
+  });
+
+  return { order, levels };
+};
+
+const buildNestedAndExpression = (orderedItems) => {
+  if (!orderedItems || orderedItems.length === 0) return '';
+
+  const stack = [[]];
+
+  orderedItems.forEach((item) => {
+    let targetLevel = item.level;
+
+    if (targetLevel > stack.length - 1) {
+      targetLevel = stack.length;
+    }
+
+    while (stack.length - 1 > targetLevel) {
+      const finished = stack.pop();
+      if (finished.length > 0) {
+        stack[stack.length - 1].push(`(${finished.join(' AND ')})`);
+      }
+    }
+
+    while (stack.length - 1 < targetLevel) {
+      stack.push([]);
+    }
+
+    stack[stack.length - 1].push(item.expression);
+  });
+
+  while (stack.length > 1) {
+    const finished = stack.pop();
+    if (finished.length > 0) {
+      stack[stack.length - 1].push(`(${finished.join(' AND ')})`);
+    }
+  }
+
+  return stack[0].join(' AND ');
+};
+
 const convertToQuery = (state) => {
   var loneNodeQueries = [];
   var simpleReturnVars = []; // For nodes and edge paths (non-aggregated)
   var aggregationEntries = []; // Objects: { expr, alias, operator, value, hasCondition, isLegacy }
   var allPredsArr = [];
   var predQueriesMap = {};
+  var predQueriesByNode = {};
+  var predicateNestingByNode = {};
   
   for (var i = 0; i < state.nodes.length; i++) {
     var curNode = state.nodes[i];
@@ -208,6 +278,7 @@ const convertToQuery = (state) => {
       loneNodeQueries.push(`(${curNode.data.rep}:${curNode.data.label})`);
     }
     if (curNode.data.predicates) {
+      var nodePredQueries = {};
       Object.keys(curNode.data.predicates).forEach(function (attr) {
         const preds = curNode.data.predicates[attr].data;
         var predsStringsArr = preds
@@ -218,9 +289,16 @@ const convertToQuery = (state) => {
             return `${curNode.data.rep}.${attr} ${Constants.OPERATORS[op]} ${predVal}`;
           });
         if (predsStringsArr.length > 0) {
-          predQueriesMap[`${curNode.id}_${attr}`] = predsStringsArr.join(' AND ');
+          const predQuery = predsStringsArr.join(' AND ');
+          predQueriesMap[`${curNode.id}_${attr}`] = predQuery;
+          nodePredQueries[attr] = predQuery;
         }
       });
+
+      if (Object.keys(nodePredQueries).length > 0) {
+        predQueriesByNode[curNode.id] = nodePredQueries;
+        predicateNestingByNode[curNode.id] = normalizePredicateNesting(curNode.data.predicateNesting, Object.keys(nodePredQueries));
+      }
     }
 
     // DNF Predicates
@@ -270,17 +348,58 @@ const convertToQuery = (state) => {
   Object.keys(predQueriesMap).forEach(function (key) {
     var root = findOR(key) || key;
     if (!orGroups[root]) orGroups[root] = [];
-    orGroups[root].push(predQueriesMap[key]);
+    orGroups[root].push(key);
   });
 
+  var groupedExpressionByKey = {};
   Object.keys(orGroups).forEach(function (root) {
-    var group = orGroups[root];
-    if (group.length === 1) {
-      allPredsArr.push(group[0]);
-    } else if (group.length > 1) {
-      allPredsArr.push(`(${group.join(' OR ')})`);
+    var keys = orGroups[root];
+    var expressions = keys
+      .map(function (key) {
+        return predQueriesMap[key];
+      })
+      .filter(Boolean);
+
+    if (expressions.length === 0) return;
+
+    var groupedExpression = expressions.length === 1
+      ? expressions[0]
+      : `(${expressions.join(' OR ')})`;
+
+    keys.forEach(function (key) {
+      groupedExpressionByKey[key] = groupedExpression;
+    });
+  });
+
+  var emittedGroupRoots = {};
+  state.nodes.forEach(function (node) {
+    var nodePredQueries = predQueriesByNode[node.id];
+    if (!nodePredQueries) return;
+
+    var nesting = predicateNestingByNode[node.id] || normalizePredicateNesting({}, Object.keys(nodePredQueries));
+    var orderedItems = [];
+
+    nesting.order.forEach(function (attr) {
+      var key = `${node.id}_${attr}`;
+      var root = findOR(key) || key;
+      if (emittedGroupRoots[root]) return;
+
+      var expression = groupedExpressionByKey[key] || nodePredQueries[attr];
+      if (!expression) return;
+
+      emittedGroupRoots[root] = true;
+      orderedItems.push({
+        expression,
+        level: nesting.levels[attr] || 0
+      });
+    });
+
+    var nodeExpression = buildNestedAndExpression(orderedItems);
+    if (nodeExpression) {
+      allPredsArr.push(nodeExpression);
     }
   });
+
   var allRsQueries = [];
   var joinNodes = state.nodes.filter(n => n.data.isJoin);
   console.log("HHH",state.predicateLinks)

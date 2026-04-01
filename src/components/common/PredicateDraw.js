@@ -7,6 +7,12 @@ const neo4j = require('neo4j-driver');
 const {Title, Text} = Typography
 const {Option} = Select;
 
+const formatOptionLabel = (value) => {
+  if (value === true) return 'True';
+  if (value === false) return 'False';
+  return `${value}`;
+};
+
 const PredicateSelectorCard = ({
   removePredicate,
   handleChange,
@@ -68,18 +74,19 @@ const PredicateSelectorCard = ({
                   handleChange(index, 1, val)
                 }}
                 virtual={true}
-                value={{value: predVal.value}}
+                value={predVal.value}
                 style={{width: 210}}
                 size="small"
                 showSearch
                 placeholder="Value"
                 optionFilterProp="children"
                 filterOption={(input, option) =>
-                  `${option.children}`.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                  `${option.children || ''}`.toLowerCase().indexOf(input.toLowerCase()) >= 0
                 }
               >
-                {options.map((v) => {
-                  return(<Option key={v} value={v} >{v}</Option>)
+                {options.map((v, optionIndex) => {
+                  const optionLabel = formatOptionLabel(v);
+                  return(<Option key={`${typeof v}-${optionLabel}-${optionIndex}`} value={v} >{optionLabel}</Option>)
                 })}
               </Select>
             </div>

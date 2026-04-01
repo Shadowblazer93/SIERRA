@@ -10,12 +10,17 @@ import {
   SortAscendingOutlined
 } from '@ant-design/icons';
 import React, {useState, useContext, useMemo, useEffect} from 'react';
-import { PRED_COLOR_V2 } from '../../constants';
+import CodeMirror from '@uiw/react-codemirror';
+import { StreamLanguage } from '@codemirror/stream-parser';
+import { EditorView } from '@codemirror/view';
+import { cypher } from '@codemirror/legacy-modes/mode/cypher';
+import { PRED_COLOR_V2, OPERATORS } from '../../constants';
 import { Context } from '../../Store';
-import { PredicateDraw, PredicateCheckBox, SelectTag } from '../common';
+import { PredicateDraw, PredicateCheckBox } from '../common';
 import { getNodeId } from '../../utils/getNodeId';
 import useVisualActions from '../../hooks/useVisualActions';
 import DNFBuilder from './DNFBuilder';
+import { buildOrGroupRoots } from '../../utils/orGroupRoots';
 
 const { Title } = Typography
 
@@ -28,10 +33,13 @@ const NESTING_LEVEL_COLORS = [
   '#fff1f0'
 ];
 
+const normalizePredicateMode = (mode) => (String(mode || '').toUpperCase() === 'OR' ? 'OR' : 'AND');
+
 const normalizePredicateNesting = (predicateNesting, predicateKeys) => {
   const source = (predicateNesting && typeof predicateNesting === 'object') ? predicateNesting : {};
   const sourceOrder = Array.isArray(source.order) ? source.order : [];
   const sourceLevels = (source.levels && typeof source.levels === 'object') ? source.levels : {};
+  const sourceModes = (source.modes && typeof source.modes === 'object') ? source.modes : {};
 
   const keySet = new Set(predicateKeys);
   const seen = new Set();
@@ -50,16 +58,19 @@ const normalizePredicateNesting = (predicateNesting, predicateKeys) => {
   });
 
   const normalizedLevels = {};
+  const normalizedModes = {};
   normalizedOrder.forEach((attr, index) => {
     const raw = Number.parseInt(sourceLevels[attr], 10);
     const safeLevel = Number.isFinite(raw) && raw > 0 ? raw : 0;
-    const maxLevel = index === 0 ? 0 : (normalizedLevels[normalizedOrder[index - 1]] + 1);
+    const maxLevel = index === 0 ? safeLevel : (normalizedLevels[normalizedOrder[index - 1]] + 1);
     normalizedLevels[attr] = Math.min(safeLevel, maxLevel);
+    normalizedModes[attr] = normalizePredicateMode(sourceModes[attr]);
   });
 
   return {
     order: normalizedOrder,
-    levels: normalizedLevels
+    levels: normalizedLevels,
+    modes: normalizedModes
   };
 };
 
@@ -68,7 +79,7 @@ const clampLevelsToOrder = (order, levels) => {
   order.forEach((attr, index) => {
     const raw = Number.parseInt(levels[attr], 10);
     const safeLevel = Number.isFinite(raw) && raw > 0 ? raw : 0;
-    const maxLevel = index === 0 ? 0 : (clampedLevels[order[index - 1]] + 1);
+    const maxLevel = index === 0 ? safeLevel : (clampedLevels[order[index - 1]] + 1);
     clampedLevels[attr] = Math.min(safeLevel, maxLevel);
   });
   return clampedLevels;
@@ -79,6 +90,99 @@ const moveItem = (arr, fromIndex, toIndex) => {
   const [item] = next.splice(fromIndex, 1);
   next.splice(toIndex, 0, item);
   return next;
+};
+
+const normalizeLogicalConnector = (value) => (String(value || '').toUpperCase() === 'OR' ? 'OR' : 'AND');
+
+const renderLogicalTokens = (tokens, omitFirstConnector = true) => {
+  if (!tokens || tokens.length === 0) return '';
+
+  return tokens
+    .map((token, index) => {
+      const connector = normalizeLogicalConnector(token.connector);
+      if (index === 0 && omitFirstConnector) {
+        return token.expression;
+      }
+      return `${connector} ${token.expression}`;
+    })
+    .join(' ');
+};
+
+const buildNestedExpression = (orderedItems) => {
+  if (!orderedItems || orderedItems.length === 0) return '';
+
+  const stack = [[]];
+
+  orderedItems.forEach((item) => {
+    let targetLevel = item.level;
+
+    if (targetLevel > stack.length - 1) {
+      targetLevel = stack.length;
+    }
+
+    while (stack.length - 1 > targetLevel) {
+      const finished = stack.pop();
+      if (finished.length > 0) {
+        const collapsedExpression = `(${renderLogicalTokens(finished, true)})`;
+        const collapsedConnector = finished[0]?.connector || 'AND';
+        stack[stack.length - 1].push({
+          connector: collapsedConnector,
+          expression: collapsedExpression
+        });
+      }
+    }
+
+    while (stack.length - 1 < targetLevel) {
+      stack.push([]);
+    }
+
+    stack[stack.length - 1].push({
+      connector: normalizeLogicalConnector(item.connector),
+      expression: item.expression
+    });
+  });
+
+  while (stack.length > 1) {
+    const finished = stack.pop();
+    if (finished.length > 0) {
+      const collapsedExpression = `(${renderLogicalTokens(finished, true)})`;
+      const collapsedConnector = finished[0]?.connector || 'AND';
+      stack[stack.length - 1].push({
+        connector: collapsedConnector,
+        expression: collapsedExpression
+      });
+    }
+  }
+
+  return renderLogicalTokens(stack[0], true);
+};
+
+const normalizePredicateValue = (value) => {
+  if (value && typeof value === 'object' && 'low' in value && 'high' in value) {
+    return value.low;
+  }
+  return value;
+};
+
+const formatCypherValue = (value) => {
+  if (value === undefined || value === null) return value;
+  if (typeof value !== 'string') return value;
+
+  const escapedBackslashes = value.replace(/\\/g, '\\\\');
+
+  if (value.includes("'")) {
+    return `"${escapedBackslashes.replace(/"/g, '\\"')}"`;
+  }
+
+  return `'${escapedBackslashes.replace(/'/g, "\\'")}'`;
+};
+
+const getNodeRepFallback = (nodeId) => {
+  const parsed = Number.parseInt(nodeId, 10);
+  if (Number.isFinite(parsed)) {
+    return (parsed + 10).toString(36);
+  }
+  return `n${String(nodeId).replace(/[^A-Za-z0-9_]/g, '_')}`;
 };
 
 const NodePredicateModal = ({
@@ -163,6 +267,81 @@ const NodePredicateModal = ({
     return relMap;
   }, [state.orLinks, nodeId, predicateKeySignature, normalizedNesting.order, nestingDrawerVisible]);
 
+  const nodePredicatePreview = useMemo(() => {
+    const currentNode = (state.nodes || []).find((n) => String(n.id) === String(nodeId));
+    const rep = currentNode?.data?.rep || getNodeRepFallback(nodeId);
+    const orGroupRoots = buildOrGroupRoots(state.nodes, state.orLinks);
+
+    const attrExpressionMap = {};
+    Object.keys(predicates || {}).forEach((attr) => {
+      const predRows = predicates[attr]?.data || [];
+      const terms = predRows
+        .map((pred) => {
+          const rawValue = normalizePredicateValue(pred?.[1]);
+          if (rawValue === '' || rawValue === undefined || rawValue === null) return null;
+          const op = OPERATORS[pred?.[0]] || pred?.[0] || '=';
+          const value = formatCypherValue(rawValue);
+          return `${rep}.${attr} ${op} ${value}`;
+        })
+        .filter(Boolean);
+
+      if (terms.length > 0) {
+        attrExpressionMap[attr] = terms.join(' AND ');
+      }
+    });
+
+    const groupedExpressionByAttr = {};
+    const groups = {};
+
+    Object.keys(attrExpressionMap).forEach((attr) => {
+      const key = `${nodeId}_${attr}`;
+      const root = orGroupRoots[key] || key;
+      if (!groups[root]) groups[root] = [];
+      groups[root].push(attr);
+    });
+
+    Object.keys(groups).forEach((root) => {
+      const attrs = groups[root];
+      const expressions = attrs
+        .map((attr) => attrExpressionMap[attr])
+        .filter(Boolean);
+      if (expressions.length === 0) return;
+
+      const groupedExpression = expressions.length === 1
+        ? expressions[0]
+        : `(${expressions.join(' OR ')})`;
+
+      attrs.forEach((attr) => {
+        groupedExpressionByAttr[attr] = groupedExpression;
+      });
+    });
+
+    const emittedRoots = new Set();
+    const orderedItems = [];
+
+    (normalizedNesting.order || []).forEach((attr) => {
+      const key = `${nodeId}_${attr}`;
+      const root = orGroupRoots[key] || key;
+      if (emittedRoots.has(root)) return;
+
+      const expression = groupedExpressionByAttr[attr] || attrExpressionMap[attr];
+      if (!expression) return;
+
+      emittedRoots.add(root);
+      orderedItems.push({
+        expression,
+        level: normalizedNesting.levels[attr] || 0,
+        connector: normalizedNesting.modes[attr] || 'AND'
+      });
+    });
+
+    return buildNestedExpression(orderedItems);
+  }, [nodeId, normalizedNesting, predicates, state.nodes, state.orLinks]);
+
+  const previewQueryText = nodePredicatePreview
+    ? `WHERE ${nodePredicatePreview}`
+    : '-- No valid predicates for this node --';
+
   const shiftIndentation = (attr, delta) => {
     const index = normalizedNesting.order.indexOf(attr);
     if (index < 0) return;
@@ -172,10 +351,11 @@ const NodePredicateModal = ({
     if (nextLevel < 0) nextLevel = 0;
 
     if (delta > 0) {
-      if (index === 0) return;
-      const prevAttr = normalizedNesting.order[index - 1];
-      const prevLevel = normalizedNesting.levels[prevAttr] || 0;
-      nextLevel = Math.min(nextLevel, prevLevel + 1);
+      if (index > 0) {
+        const prevAttr = normalizedNesting.order[index - 1];
+        const prevLevel = normalizedNesting.levels[prevAttr] || 0;
+        nextLevel = Math.min(nextLevel, prevLevel + 1);
+      }
     }
 
     const nextLevels = {
@@ -183,7 +363,21 @@ const NodePredicateModal = ({
       [attr]: nextLevel
     };
     const clamped = clampLevelsToOrder(normalizedNesting.order, nextLevels);
-    persistNestingState({ order: normalizedNesting.order, levels: clamped });
+    persistNestingState({ order: normalizedNesting.order, levels: clamped, modes: normalizedNesting.modes });
+  };
+
+  const togglePredicateMode = (attr) => {
+    const currentMode = normalizePredicateMode(normalizedNesting.modes[attr]);
+    const nextModes = {
+      ...normalizedNesting.modes,
+      [attr]: currentMode === 'OR' ? 'AND' : 'OR'
+    };
+
+    persistNestingState({
+      order: normalizedNesting.order,
+      levels: normalizedNesting.levels,
+      modes: nextModes
+    });
   };
 
   const handleDropOnAttribute = (targetAttr) => {
@@ -203,7 +397,7 @@ const NodePredicateModal = ({
 
     const reordered = moveItem(normalizedNesting.order, fromIndex, toIndex);
     const clampedLevels = clampLevelsToOrder(reordered, normalizedNesting.levels);
-    persistNestingState({ order: reordered, levels: clampedLevels });
+    persistNestingState({ order: reordered, levels: clampedLevels, modes: normalizedNesting.modes });
     setDropTargetAttr('');
     setDraggedAttr('');
   };
@@ -306,11 +500,89 @@ const NodePredicateModal = ({
             Change Nesting
           </Button>
 
-          {Object.keys(predicates).map((attr, i) => {
-            const colour = PRED_COLOR_V2[attributes.indexOf(attr) % PRED_COLOR_V2.length]
+          {normalizedNesting.order.map((attr, i) => {
+            const attrIndex = attributes.indexOf(attr);
+            const colorIndex = attrIndex === -1 ? i : attrIndex;
+            const colour = PRED_COLOR_V2[colorIndex % PRED_COLOR_V2.length];
+            const mode = normalizePredicateMode(normalizedNesting.modes[attr]);
             return (
-              <div key={`pt-${i}`}>
-                <SelectTag onClick={() => {showChildrenDrawer(attr);}} colour={colour.name} key={`${attr}-k`} text={attr} />
+              <React.Fragment key={`pt-${attr}`}>
+                {i > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'center', margin: '0 0 2px' }}>
+                    <Button
+                      size="small"
+                      type={mode === 'OR' ? 'primary' : 'default'}
+                      style={mode === 'OR'
+                        ? {
+                            backgroundColor: '#fa8c16',
+                            borderColor: '#fa8c16',
+                            fontWeight: 600,
+                            height: 16,
+                            minWidth: 30,
+                            fontSize: 9,
+                            lineHeight: '14px',
+                            padding: '0 4px'
+                          }
+                        : {
+                            fontWeight: 600,
+                            height: 16,
+                            minWidth: 30,
+                            fontSize: 9,
+                            lineHeight: '14px',
+                            padding: '0 4px'
+                          }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        togglePredicateMode(attr);
+                      }}
+                    >
+                      {mode}
+                    </Button>
+                  </div>
+                )}
+
+                <div
+                  onClick={() => {showChildrenDrawer(attr);}}
+                  style={{
+                    borderRadius: 6,
+                    padding: '0 8px',
+                    display: 'flex',
+                    flexDirection: 'row',
+                    cursor: 'pointer',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                    height: 34,
+                    width: '100%',
+                    marginBottom: 6,
+                    backgroundColor: colour.light,
+                    border: `1px solid ${colour.secondary}`,
+                    transition: '0.2s'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, gap: 8 }}>
+                    <span
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        backgroundColor: colour.primary,
+                        border: `1px solid ${colour.secondary}`,
+                        flexShrink: 0
+                      }}
+                    />
+                    <span
+                      style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        fontWeight: 600,
+                        color: '#262626'
+                      }}
+                    >
+                      {attr}
+                    </span>
+                  </div>
+                </div>
                 <PredicateDraw
                   onClose={() => onChildrenDrawerClose(attr)}
                   attr={attr}
@@ -323,7 +595,7 @@ const NodePredicateModal = ({
                   }
                   titleColor={colour.secondary}
                   visible={childrenDrawer[attr]}/>
-              </div>
+              </React.Fragment>
             )
           })}
         </div>
@@ -564,124 +836,165 @@ const NodePredicateModal = ({
 
             {normalizedNesting.order.map((attr, index) => {
               const level = normalizedNesting.levels[attr] || 0;
+              const mode = normalizePredicateMode(normalizedNesting.modes[attr]);
               const relationAttrs = relationshipMap[attr] || [];
               const levelColor = NESTING_LEVEL_COLORS[level % NESTING_LEVEL_COLORS.length];
+              const indentOffset = Math.min(level, 6) * 12;
               const isDropTarget = dropTargetAttr === attr && draggedAttr && draggedAttr !== attr;
-              const canIndentRight = index > 0 && level < ((normalizedNesting.levels[normalizedNesting.order[index - 1]] || 0) + 1);
+              const canIndentRight = index === 0 || level < ((normalizedNesting.levels[normalizedNesting.order[index - 1]] || 0) + 1);
 
               return (
-                <div
-                  key={`nest-${attr}`}
-                  draggable
-                  onDragStart={(event) => {
-                    setDraggedAttr(attr);
-                    event.dataTransfer.effectAllowed = 'move';
-                  }}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    if (draggedAttr && draggedAttr !== attr) {
-                      setDropTargetAttr(attr);
-                    }
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    handleDropOnAttribute(attr);
-                  }}
-                  onDragEnd={() => {
-                    setDraggedAttr('');
-                    setDropTargetAttr('');
-                  }}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1.25fr 1fr 96px',
-                    gap: 8,
-                    alignItems: 'center',
-                    marginBottom: 8,
-                    padding: '8px 10px',
-                    borderRadius: 8,
-                    border: isDropTarget ? '1px dashed #1677ff' : '1px solid #e5e5e5',
-                    background: levelColor,
-                    boxShadow: isDropTarget ? '0 0 0 2px rgba(22, 119, 255, 0.12)' : 'none',
-                    cursor: 'grab'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
-                    <DragOutlined style={{ color: '#777', marginRight: 8, flexShrink: 0 }} />
-                    <Tooltip title={`Nesting level ${level}`}>
-                      <span
-                        style={{
-                          width: 18,
-                          height: 18,
-                          minWidth: 18,
-                          borderRadius: '50%',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: '#1f1f1f',
-                          border: '1px solid #bfbfbf',
-                          background: '#fff',
-                          marginRight: 8,
-                          flexShrink: 0
-                        }}
-                      >
-                        {level}
+                <React.Fragment key={`nest-${attr}`}>
+                  <div style={{ display: 'flex', justifyContent: 'center', margin: '2px 0 6px' }}>
+                    <Button
+                      size="small"
+                      type={mode === 'OR' ? 'primary' : 'default'}
+                      style={mode === 'OR' ? { backgroundColor: '#fa8c16', borderColor: '#fa8c16', fontWeight: 600 } : { fontWeight: 600 }}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        togglePredicateMode(attr);
+                      }}
+                    >
+                      {mode}
+                    </Button>
+                  </div>
+
+                  <div
+                    draggable
+                    onDragStart={(event) => {
+                      setDraggedAttr(attr);
+                      event.dataTransfer.effectAllowed = 'move';
+                    }}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      if (draggedAttr && draggedAttr !== attr) {
+                        setDropTargetAttr(attr);
+                      }
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      handleDropOnAttribute(attr);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedAttr('');
+                      setDropTargetAttr('');
+                    }}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1.25fr 1fr 96px',
+                      gap: 8,
+                      alignItems: 'center',
+                      marginBottom: 8,
+                      marginLeft: indentOffset,
+                      padding: '8px 10px',
+                      borderRadius: 8,
+                      border: isDropTarget ? '1px dashed #1677ff' : '1px solid #e5e5e5',
+                      background: levelColor,
+                      boxShadow: isDropTarget ? '0 0 0 2px rgba(22, 119, 255, 0.12)' : 'none',
+                      cursor: 'grab'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+                      <DragOutlined style={{ color: '#777', marginRight: 8, flexShrink: 0 }} />
+                      <Tooltip title={`Nesting level ${level}`}>
+                        <span
+                          style={{
+                            width: 18,
+                            height: 18,
+                            minWidth: 18,
+                            borderRadius: '50%',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: '#1f1f1f',
+                            border: '1px solid #bfbfbf',
+                            background: '#fff',
+                            marginRight: 8,
+                            flexShrink: 0
+                          }}
+                        >
+                          {level}
+                        </span>
+                      </Tooltip>
+                      <span style={{
+                        display: 'inline-block',
+                        maxWidth: '100%',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        paddingLeft: 0,
+                        fontWeight: 600,
+                        color: '#1f1f1f'
+                      }}>
+                        {attr}
                       </span>
-                    </Tooltip>
-                    <span style={{
-                      display: 'inline-block',
-                      maxWidth: '100%',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      paddingLeft: `${Math.min(level, 6) * 10}px`,
-                      fontWeight: 600,
-                      color: '#1f1f1f'
-                    }}>
-                      {attr}
-                    </span>
-                  </div>
+                    </div>
 
-                  <div style={{ minHeight: 24, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
-                    {relationAttrs.length > 0 ? (
-                      relationAttrs.map((peerAttr) => (
-                        <Tag key={`${attr}-rel-${peerAttr}`} color="orange" style={{ marginRight: 0 }}>
-                          OR {peerAttr}
+                    <div style={{ minHeight: 24, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                      {relationAttrs.length > 0 ? relationAttrs.map((peerAttr) => (
+                        <Tag key={`${attr}-rel-${peerAttr}`} color="gold" style={{ marginRight: 0 }}>
+                          LINK {peerAttr}
                         </Tag>
-                      ))
-                    ) : (
-                      <span style={{ color: '#595959', fontSize: 12 }}>AND</span>
-                    )}
-                  </div>
+                      )) : (
+                        <span style={{ color: '#8c8c8c', fontSize: 12 }}>No links</span>
+                      )}
+                    </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4 }}>
-                    <Tooltip title="Outdent">
-                      <Button
-                        size="small"
-                        icon={<LeftOutlined />}
-                        disabled={level === 0}
-                        onClick={() => shiftIndentation(attr, -1)}
-                      />
-                    </Tooltip>
-                    <Tooltip title="Indent">
-                      <Button
-                        size="small"
-                        icon={<RightOutlined />}
-                        disabled={!canIndentRight}
-                        onClick={() => shiftIndentation(attr, 1)}
-                      />
-                    </Tooltip>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4 }}>
+                      <Tooltip title="Outdent">
+                        <Button
+                          size="small"
+                          icon={<LeftOutlined />}
+                          disabled={level === 0}
+                          onClick={() => shiftIndentation(attr, -1)}
+                        />
+                      </Tooltip>
+                      <Tooltip title="Indent">
+                        <Button
+                          size="small"
+                          icon={<RightOutlined />}
+                          disabled={!canIndentRight}
+                          onClick={() => shiftIndentation(attr, 1)}
+                        />
+                      </Tooltip>
+                    </div>
                   </div>
-                </div>
+                </React.Fragment>
               );
             })}
 
             {normalizedNesting.order.length > 0 && (
               <div style={{ marginTop: 12, color: '#666', fontSize: 12 }}>
-                Drag rows to reorder predicates. Indentation levels add bracket groups in the generated query.
+                Drag rows to reorder predicates. Connector buttons between predicates switch AND/OR, and indentation controls bracket grouping in the generated query.
               </div>
             )}
+
+            <div
+              style={{
+                marginTop: 14,
+                border: '1px solid #e5e5e5',
+                borderRadius: 8,
+                background: '#fafafa',
+                padding: 10,
+                maxWidth: '100%',
+                boxSizing: 'border-box',
+                overflow: 'hidden'
+              }}
+            >
+              <div style={{ fontSize: 11, color: '#595959', textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>
+                Live Query Preview
+              </div>
+              <CodeMirror
+                value={previewQueryText}
+                height="120px"
+                extensions={[StreamLanguage.define(cypher), EditorView.lineWrapping]}
+                readOnly
+                style={{ maxWidth: '100%' }}
+              />
+            </div>
           </div>
         </Drawer>
 

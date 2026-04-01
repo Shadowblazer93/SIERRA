@@ -22,6 +22,7 @@ import useVisualActions from './hooks/useVisualActions'
 import JoinGraphView from './components/JoinGraphView';
 import QueryControls from './components/QueryControls';
 import { buildDnfAndLinksFromQuery } from './utils/dnfGraph';
+import { buildOrGroupRoots } from './utils/orGroupRoots';
 const neo4jApi = require('./neo4jApi')
 const pkg = require('../package.json')
 
@@ -77,39 +78,8 @@ function App() {
   };
 
   const orGroupRoots = useMemo(() => {
-    const orLinks = state.orLinks || [];
-    const parents = {};
-    const ensure = (key) => {
-      if (!parents[key]) parents[key] = key;
-    };
-    const find = (key) => {
-      if (!parents[key]) return undefined;
-      if (parents[key] === key) return key;
-      parents[key] = find(parents[key]);
-      return parents[key];
-    };
-    const union = (a, b) => {
-      const rootA = find(a);
-      const rootB = find(b);
-      if (rootA && rootB && rootA !== rootB) {
-        parents[rootA] = rootB;
-      }
-    };
-
-    orLinks.forEach((link) => {
-      const fromKey = `${link.from.nodeId}_${link.from.attr}`;
-      const toKey = `${link.to.nodeId}_${link.to.attr}`;
-      ensure(fromKey);
-      ensure(toKey);
-      union(fromKey, toKey);
-    });
-
-    const rootByKey = {};
-    Object.keys(parents).forEach((key) => {
-      rootByKey[key] = find(key) || key;
-    });
-    return rootByKey;
-  }, [state.orLinks]);
+    return buildOrGroupRoots(state.nodes, state.orLinks);
+  }, [state.nodes, state.orLinks]);
 
   const getOrGroupPredicateKeys = (groupId) => {
     if (!groupId) return [];
@@ -813,6 +783,7 @@ function App() {
                       color: n.color,
                       radius: n.radius,
                       isBold: n.isBold,
+                      orGroupRoots,
                       onOrGroupOpen: handleOrGroupOpen,
                       onOrGroupHoverStart: handleOrGroupHoverStart,
                       onOrGroupHoverEnd: handleOrGroupHoverEnd,

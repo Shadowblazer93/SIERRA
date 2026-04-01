@@ -158,6 +158,7 @@ const normalizePredicateNesting = (predicateNesting, attrs) => {
   const source = (predicateNesting && typeof predicateNesting === 'object') ? predicateNesting : {};
   const sourceOrder = Array.isArray(source.order) ? source.order : [];
   const sourceLevels = (source.levels && typeof source.levels === 'object') ? source.levels : {};
+  const sourceModes = (source.modes && typeof source.modes === 'object') ? source.modes : {};
 
   const attrSet = new Set(attrs);
   const seen = new Set();
@@ -176,14 +177,32 @@ const normalizePredicateNesting = (predicateNesting, attrs) => {
   });
 
   const levels = {};
+  const modes = {};
   order.forEach((attr, index) => {
     const raw = Number.parseInt(sourceLevels[attr], 10);
     const safeLevel = Number.isFinite(raw) && raw > 0 ? raw : 0;
-    const maxLevel = index === 0 ? 0 : levels[order[index - 1]] + 1;
+    const maxLevel = index === 0 ? safeLevel : levels[order[index - 1]] + 1;
     levels[attr] = Math.min(safeLevel, maxLevel);
+    modes[attr] = String(sourceModes[attr] || '').toUpperCase() === 'OR' ? 'OR' : 'AND';
   });
 
-  return { order, levels };
+  return { order, levels, modes };
+};
+
+const normalizeLogicalConnector = (value) => (String(value || '').toUpperCase() === 'OR' ? 'OR' : 'AND');
+
+const renderLogicalTokens = (tokens, omitFirstConnector = true) => {
+  if (!tokens || tokens.length === 0) return '';
+
+  return tokens
+    .map((token, index) => {
+      const connector = normalizeLogicalConnector(token.connector);
+      if (index === 0 && omitFirstConnector) {
+        return token.expression;
+      }
+      return `${connector} ${token.expression}`;
+    })
+    .join(' ');
 };
 
 const buildNestedAndExpression = (orderedItems) => {
@@ -201,7 +220,12 @@ const buildNestedAndExpression = (orderedItems) => {
     while (stack.length - 1 > targetLevel) {
       const finished = stack.pop();
       if (finished.length > 0) {
-        stack[stack.length - 1].push(`(${finished.join(' AND ')})`);
+        const collapsedExpression = `(${renderLogicalTokens(finished, true)})`;
+        const collapsedConnector = finished[0]?.connector || 'AND';
+        stack[stack.length - 1].push({
+          connector: collapsedConnector,
+          expression: collapsedExpression
+        });
       }
     }
 
@@ -209,17 +233,38 @@ const buildNestedAndExpression = (orderedItems) => {
       stack.push([]);
     }
 
-    stack[stack.length - 1].push(item.expression);
+    stack[stack.length - 1].push({
+      connector: normalizeLogicalConnector(item.connector),
+      expression: item.expression
+    });
   });
 
   while (stack.length > 1) {
     const finished = stack.pop();
     if (finished.length > 0) {
-      stack[stack.length - 1].push(`(${finished.join(' AND ')})`);
+      const collapsedExpression = `(${renderLogicalTokens(finished, true)})`;
+      const collapsedConnector = finished[0]?.connector || 'AND';
+      stack[stack.length - 1].push({
+        connector: collapsedConnector,
+        expression: collapsedExpression
+      });
     }
   }
 
-  return stack[0].join(' AND ');
+  return renderLogicalTokens(stack[0], true);
+};
+
+const formatCypherValue = (value) => {
+  if (value === undefined || value === null) return value;
+  if (typeof value !== 'string') return value;
+
+  const escapedBackslashes = value.replace(/\\/g, '\\\\');
+
+  if (value.includes("'")) {
+    return `"${escapedBackslashes.replace(/"/g, '\\"')}"`;
+  }
+
+  return `'${escapedBackslashes.replace(/'/g, "\\'")}'`;
 };
 
 const convertToQuery = (state) => {
@@ -255,7 +300,7 @@ const convertToQuery = (state) => {
                         if (!alias) alias = `agg_node${curNode.id}_${idx}`;
                         // Simple check if value is numeric string
                         const isNum = !isNaN(parseFloat(agg.value)) && isFinite(agg.value);
-                        const val = isNum ? agg.value : `'${agg.value}'`;
+                        const val = isNum ? agg.value : formatCypherValue(agg.value);
                         condition = `${alias} ${agg.operator} ${val}`;
                     }
 
@@ -285,7 +330,7 @@ const convertToQuery = (state) => {
           .filter(pred => pred[1] !== '' && pred[1] !== undefined && pred[1] !== null)
           .map(function (pred) {
             const op = pred[0];
-            const predVal = typeof pred[1] === 'string' ? `'${pred[1]}'` : pred[1];
+            const predVal = formatCypherValue(pred[1]);
             return `${curNode.data.rep}.${attr} ${Constants.OPERATORS[op]} ${predVal}`;
           });
         if (predsStringsArr.length > 0) {
@@ -307,7 +352,7 @@ const convertToQuery = (state) => {
             const rowPreds = row.predicates
                 .filter(p => p.attr && p.val !== undefined && p.val !== null && p.val !== '')
                 .map(p => {
-                    const val = typeof p.val === 'string' ? `'${p.val}'` : p.val;
+              const val = formatCypherValue(p.val);
                     return `${curNode.data.rep}.${p.attr} ${Constants.OPERATORS[p.op] || p.op} ${val}`;
                 });
             return rowPreds.length > 0 ? `(${rowPreds.join(' AND ')})` : null;
@@ -390,7 +435,8 @@ const convertToQuery = (state) => {
       emittedGroupRoots[root] = true;
       orderedItems.push({
         expression,
-        level: nesting.levels[attr] || 0
+        level: nesting.levels[attr] || 0,
+        connector: nesting.modes[attr] || 'AND'
       });
     });
 
@@ -452,7 +498,7 @@ const convertToQuery = (state) => {
               .filter(pred => pred[1] !== '' && pred[1] !== undefined && pred[1] !== null)
               .map(function (pred) {
                 const op = pred[0];
-                const predVal = typeof pred[1] === 'string' ? `'${pred[1]}'` : pred[1];
+                const predVal = formatCypherValue(pred[1]);
                 if (isVarLength) {
                     return `ALL(rel in ${rsLabel} WHERE rel.${attr} ${Constants.OPERATORS[op]} ${predVal})`;
                 }
@@ -466,7 +512,7 @@ const convertToQuery = (state) => {
         if (Array.isArray(currEdge.data.cardinalityProps) && currEdge.data.cardinalityProps.length > 0) {
           currEdge.data.cardinalityProps.forEach(prop => {
             if (prop.key && prop.value !== undefined && prop.value !== null && prop.value !== '') {
-              const val = typeof prop.value === 'string' ? `'${prop.value}'` : prop.value;
+              const val = formatCypherValue(prop.value);
               const op = prop.operator || '=';
               let pred;
               if (isVarLength) {

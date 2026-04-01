@@ -14,6 +14,7 @@ import { set } from 'lodash';
 import useVisualActions from '../hooks/useVisualActions';
 import { Tooltip } from 'antd';
 import joinIcon from '../assets/images/join_icon.png';
+import { buildOrGroupRoots } from '../utils/orGroupRoots';
 
 const api = require('../neo4jApi');
 
@@ -190,39 +191,11 @@ function Node(props) {
   }, [aggregationEntries, displayRadius, hasAggregations, hasDNF, props.id]);
 
   const orGroupRoots = useMemo(() => {
-    const orLinks = state.orLinks || [];
-    const parents = {};
-    const ensure = (key) => {
-      if (!parents[key]) parents[key] = key;
-    };
-    const find = (key) => {
-      if (!parents[key]) return undefined;
-      if (parents[key] === key) return key;
-      parents[key] = find(parents[key]);
-      return parents[key];
-    };
-    const union = (a, b) => {
-      const rootA = find(a);
-      const rootB = find(b);
-      if (rootA && rootB && rootA !== rootB) {
-        parents[rootA] = rootB;
-      }
-    };
-
-    orLinks.forEach((link) => {
-      const fromKey = `${link.from.nodeId}_${link.from.attr}`;
-      const toKey = `${link.to.nodeId}_${link.to.attr}`;
-      ensure(fromKey);
-      ensure(toKey);
-      union(fromKey, toKey);
-    });
-
-    const rootByKey = {};
-    Object.keys(parents).forEach((key) => {
-      rootByKey[key] = find(key) || key;
-    });
-    return rootByKey;
-  }, [state.orLinks]);
+    if (props.data?.orGroupRoots && typeof props.data.orGroupRoots === 'object') {
+      return props.data.orGroupRoots;
+    }
+    return buildOrGroupRoots(state.nodes, state.orLinks);
+  }, [props.data?.orGroupRoots, state.nodes, state.orLinks]);
 
   const predicateKeySignature = useMemo(() => {
     return Object.keys(predicates).sort().join('|');

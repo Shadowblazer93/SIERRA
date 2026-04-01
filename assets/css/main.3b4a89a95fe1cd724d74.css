@@ -154,6 +154,33 @@ td {
   z-index: 20;
 }
 
+.link-tool-select .ant-select-selector {
+  border-radius: 6px !important;
+  background: #ffffff;
+}
+
+.link-tool-dropdown .ant-select-item-option {
+  border-radius: 6px;
+  margin: 4px 6px;
+  padding: 6px 10px;
+}
+
+.link-tool-dropdown .link-tool-join.ant-select-item-option {
+  background: #c7a4ff;
+}
+
+.link-tool-dropdown .link-tool-or.ant-select-item-option {
+  background: #ffc88d;
+}
+
+.link-tool-dropdown .link-tool-and.ant-select-item-option {
+  background: #ccff98;
+}
+
+.link-tool-dropdown .ant-select-item-option:hover {
+  filter: brightness(0.98);
+}
+
 .ant-tooltip-inner {
   border-radius: 8px !important;
 }
@@ -251,6 +278,24 @@ td {
 
 .dark-mode .controls-custom button:hover {
   background-color: #444;
+}
+
+.db-uri-field .ant-input,
+.db-uri-field .ant-input-group-addon {
+  background-color: #dbeafe !important;
+}
+
+.db-uri-field .ant-input {
+  color: #1e3a8a;
+}
+
+.db-uri-field .ant-input::placeholder {
+  color: #3b82f6;
+}
+
+.db-uri-field .ant-input-group-addon {
+  color: #1d4ed8;
+  border-color: #93c5fd;
 }
 
 .predicate-container {

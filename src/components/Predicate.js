@@ -23,6 +23,8 @@ function Predicate(props) {
       onClick={props.onClick}
       onMouseEnter={props.onMouseEnter}
       onMouseLeave={props.onMouseLeave}
+      onMouseDown={props.onMouseDown}
+      onPointerDown={props.onPointerDown}
       title={props.title || ''}
     />
   );

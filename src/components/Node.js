@@ -684,12 +684,73 @@ function Node(props) {
           predicateLayoutsByAttr[attr] = [baseLayout];
         });
 
+        const orRepresentation = state.orRepresentation || 'concentric-circles';
         const orGroupVisualMeta = {};
+        const groupLayoutsById = {};
 
         Object.keys(orGroupsByNode).forEach((groupId) => {
           const attrs = orGroupsByNode[groupId];
           if (attrs.length < 2) return;
+
           const ordered = attrs.slice().sort((a, b) => anchorByAttr[a].index - anchorByAttr[b].index);
+
+          if (orRepresentation === 'sunflower') {
+            const radii = ordered.map((attr) => predicates[attr]?.radius ?? 8);
+            const baseRadius = Math.max(...radii);
+            const directionVector = ordered.reduce((acc, attr) => {
+              const angle = anchorByAttr[attr]?.angle ?? 0;
+              return {
+                x: acc.x + Math.cos(angle),
+                y: acc.y + Math.sin(angle)
+              };
+            }, { x: 0, y: 0 });
+            let angle = Math.atan2(directionVector.y, directionVector.x);
+            if (!Number.isFinite(angle)) {
+              angle = anchorByAttr[ordered[0]]?.angle ?? -Math.PI / 2;
+            }
+
+            const step = Math.max(8, Math.round(baseRadius * 1.08));
+            const overlap = Math.max(4, Math.round(baseRadius * 0.35));
+            const startDistance = displayRadius + baseRadius - overlap;
+            const groupLayouts = [];
+
+            ordered.forEach((attr, idx) => {
+              const radius = predicates[attr]?.radius ?? baseRadius;
+              const distance = startDistance + idx * step;
+              const layout = {
+                radius,
+                centerX: displayRadius + distance * Math.cos(angle),
+                centerY: displayRadius + distance * Math.sin(angle),
+                angle
+              };
+              groupLayouts.push(layout);
+              predicateLayout[attr] = layout;
+              predicateLayoutsByAttr[attr] = [layout];
+            });
+
+            const tipLayout = groupLayouts[groupLayouts.length - 1];
+            const tipRadius = tipLayout?.radius ?? baseRadius;
+            const tipAngle = tipLayout?.angle ?? angle;
+            const labelAnchor = tipLayout
+              ? {
+                  x: tipLayout.centerX + Math.cos(tipAngle) * (tipRadius + 14),
+                  y: tipLayout.centerY + Math.sin(tipAngle) * (tipRadius + 14)
+                }
+              : { x: displayRadius, y: displayRadius };
+
+            orGroupVisualMeta[groupId] = {
+              attrs: ordered,
+              centerX: displayRadius,
+              centerY: displayRadius,
+              outerRadius: tipLayout ? Math.hypot(tipLayout.centerX - displayRadius, tipLayout.centerY - displayRadius) + tipRadius : baseRadius,
+              angle,
+              labelAnchor,
+              tipLayout
+            };
+            groupLayoutsById[groupId] = groupLayouts;
+            return;
+          }
+
           const baseRadius = Math.max(...ordered.map((attr) => predicates[attr]?.radius ?? 8));
           const gap = 4;
           const anchorAttr = ordered[0];
@@ -710,9 +771,8 @@ function Node(props) {
             centerY,
             outerRadius
           };
+          groupLayoutsById[groupId] = ordered.map((attr) => predicateLayout[attr]).filter(Boolean);
         });
-
-        const groupLayoutsById = {};
 
         if (andGroupsByNode.length > 0) {
           const primaryLayoutByAttr = {};
@@ -822,45 +882,73 @@ function Node(props) {
           };
         };
 
-        const interJoinLoops = Object.keys(orGroupVisualMeta)
-          .map((groupId) => {
-            const groupMeta = orGroupVisualMeta[groupId];
-            if (!groupMeta || !groupMeta.attrs || groupMeta.attrs.length < 2) return null;
-
-            const attrsInGroup = new Set(groupMeta.attrs);
-            const hasInterJoin = (state.predicateLinks || []).some((link) => {
-              const sameNodeFrom = String(link.from.nodeId) === String(props.id);
-              const sameNodeTo = String(link.to.nodeId) === String(props.id);
-              if (!sameNodeFrom || !sameNodeTo) return false;
-              if (!attrsInGroup.has(link.from.attr) || !attrsInGroup.has(link.to.attr)) return false;
-              return link.from.attr !== link.to.attr;
-            });
-
-            if (!hasInterJoin) return null;
-              const loopGeometry = getLoopGeometry(groupMeta);
-
-            return {
-              key: `or-group-interjoin-${groupId}`,
-                path: loopGeometry.path,
-                transform: loopGeometry.transform
-            };
-          })
-          .filter(Boolean);
-
-          const orGroupBadges = Object.keys(orGroupVisualMeta)
+        const interJoinLoops = orRepresentation === 'sunflower'
+          ? Object.keys(orGroupVisualMeta)
+            .flatMap((groupId) => {
+              const groupMeta = orGroupVisualMeta[groupId];
+              if (!groupMeta || !groupMeta.attrs || groupMeta.attrs.length < 2) return [];
+              const attrsInGroup = new Set(groupMeta.attrs);
+              return (state.predicateLinks || [])
+                .map((link) => {
+                  const sameNodeFrom = String(link.from.nodeId) === String(props.id);
+                  const sameNodeTo = String(link.to.nodeId) === String(props.id);
+                  if (!sameNodeFrom || !sameNodeTo) return null;
+                  if (!attrsInGroup.has(link.from.attr) || !attrsInGroup.has(link.to.attr)) return null;
+                  if (link.from.attr === link.to.attr) return null;
+                  const fromLayout = predicateLayout[link.from.attr];
+                  const toLayout = predicateLayout[link.to.attr];
+                  if (!fromLayout || !toLayout) return null;
+                  return {
+                    key: `or-group-interjoin-${groupId}-${link.from.attr}-${link.to.attr}`,
+                    path: `M ${fromLayout.centerX} ${fromLayout.centerY} L ${toLayout.centerX} ${toLayout.centerY}`,
+                    transform: null,
+                    sunflower: true
+                  };
+                })
+                .filter(Boolean);
+            })
+          : Object.keys(orGroupVisualMeta)
             .map((groupId) => {
               const groupMeta = orGroupVisualMeta[groupId];
               if (!groupMeta || !groupMeta.attrs || groupMeta.attrs.length < 2) return null;
+
+              const attrsInGroup = new Set(groupMeta.attrs);
+              const hasInterJoin = (state.predicateLinks || []).some((link) => {
+                const sameNodeFrom = String(link.from.nodeId) === String(props.id);
+                const sameNodeTo = String(link.to.nodeId) === String(props.id);
+                if (!sameNodeFrom || !sameNodeTo) return false;
+                if (!attrsInGroup.has(link.from.attr) || !attrsInGroup.has(link.to.attr)) return false;
+                return link.from.attr !== link.to.attr;
+              });
+
+              if (!hasInterJoin) return null;
               const loopGeometry = getLoopGeometry(groupMeta);
+
               return {
-                key: `or-group-badge-${groupId}`,
-                groupId,
-                labelX: loopGeometry.labelAnchor.x,
-                labelY: loopGeometry.labelAnchor.y,
-                showLabel: props.data?.hoveredOrGroupId === groupId
+                key: `or-group-interjoin-${groupId}`,
+                path: loopGeometry.path,
+                transform: loopGeometry.transform,
+                sunflower: false
               };
             })
             .filter(Boolean);
+
+        const orGroupBadges = Object.keys(orGroupVisualMeta)
+          .map((groupId) => {
+            const groupMeta = orGroupVisualMeta[groupId];
+            if (!groupMeta || !groupMeta.attrs || groupMeta.attrs.length < 2) return null;
+            const labelAnchor = orRepresentation === 'sunflower' && groupMeta.labelAnchor
+              ? groupMeta.labelAnchor
+              : getLoopGeometry(groupMeta).labelAnchor;
+            return {
+              key: `or-group-badge-${groupId}`,
+              groupId,
+              labelX: labelAnchor.x,
+              labelY: labelAnchor.y,
+              showLabel: props.data?.hoveredOrGroupId === groupId
+            };
+          })
+          .filter(Boolean);
 
         return (
           <React.Fragment>

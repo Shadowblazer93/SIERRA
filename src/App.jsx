@@ -567,8 +567,14 @@ function App() {
     ? state.orLinks.map((link, idx) => {
         const fromKey = `${link.from.nodeId}_${link.from.attr}`;
         const toKey = `${link.to.nodeId}_${link.to.attr}`;
-        const isSameNodeGroup = String(link.from.nodeId) === String(link.to.nodeId);
-        const groupId = orGroupRoots[fromKey] || orGroupRoots[toKey] || fromKey;
+        const sourceGroupId = orGroupRoots[fromKey];
+        const targetGroupId = orGroupRoots[toKey];
+        const isSameNode = String(link.from.nodeId) === String(link.to.nodeId);
+        const isSameGroup = !!sourceGroupId && !!targetGroupId && sourceGroupId === targetGroupId;
+        if (state.orRepresentation === 'sunflower' && isSameGroup) {
+          return null;
+        }
+        const groupId = sourceGroupId || targetGroupId || fromKey;
         const groupColor = getOrGroupColor(groupId);
         return {
           id: `or-link-${idx}`,
@@ -582,13 +588,18 @@ function App() {
             toAttr: link.to.attr,
             orGroupId: groupId,
             orGroupColor: groupColor,
+            sourceGroupId,
+            targetGroupId,
+            isSameGroup,
+            orRepresentation: state.orRepresentation,
             onOrTextClick: handleOrGroupOpen,
             isGroupHovering: hoveredOrGroupId === groupId,
-            hideEdgeLabel: isSameNodeGroup,
+            hideEdgeLabel: isSameNode && isSameGroup,
             opacity: orOpacity
           }
         };
       })
+      .filter(Boolean)
     : [];
 
   const andLinkElements = (state.andLinks || []).length > 0
@@ -758,6 +769,8 @@ function App() {
           <QueryControls 
             options={queryOptions} 
             onOptionsChange={setQueryOptions}
+            orRepresentation={state.orRepresentation}
+            onChangeOrRepresentation={(value) => dispatch({ type: 'SET_OR_REPRESENTATION', payload: value })}
             dnfLinksVisible={state.dnfLinksVisible}
             onToggleDnfLinks={(visible) => {
               dispatch({ type: 'SET_DNF_LINKS_VISIBLE', payload: visible });

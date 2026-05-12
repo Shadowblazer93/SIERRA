@@ -9,6 +9,8 @@ const { Option } = Select;
 const QueryControls = ({
   options,
   onOptionsChange,
+  orRepresentation,
+  onChangeOrRepresentation,
   dnfLinksVisible,
   onToggleDnfLinks,
   dnfAndGroupingEnabled,
@@ -231,6 +233,23 @@ const QueryControls = ({
                     checked={!!dnfAndGroupingEnabled}
                     onChange={(checked) => onToggleDnfAndGrouping && onToggleDnfAndGrouping(checked)}
                   />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <Text strong>OR Representation</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Choose how OR predicate groups are drawn.
+                    </Text>
+                  </div>
+                  <Select
+                    value={orRepresentation || 'concentric-circles'}
+                    onChange={(value) => onChangeOrRepresentation && onChangeOrRepresentation(value)}
+                    size="small"
+                    style={{ width: 160 }}
+                  >
+                    <Option value="concentric-circles">Concentric circles</Option>
+                    <Option value="sunflower">Sunflower</Option>
+                  </Select>
                 </div>
               </div>
             </Modal>

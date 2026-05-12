@@ -45,7 +45,13 @@ function OrLinkEdge({ id, sourceX, sourceY, targetX, targetY, data }) {
   const dnfHoverActive = useRef(false);
   const startY = sourceY + 7;
   const endY = targetY + 7;
-  const edgePath = `M ${sourceX}, ${startY}L ${targetX}, ${endY}`;
+  const isSunflowerSameGroup = data?.orRepresentation === 'sunflower' && !!data?.isSameGroup;
+  const midX = (sourceX + targetX) / 2;
+  const midY = (startY + endY) / 2;
+  const curveOffset = Math.max(18, Math.min(44, Math.abs(targetX - sourceX) * 0.24 + Math.abs(endY - startY) * 0.18));
+  const edgePath = isSunflowerSameGroup
+    ? `M ${sourceX}, ${startY} Q ${midX}, ${midY - curveOffset} ${targetX}, ${endY}`
+    : `M ${sourceX}, ${startY}L ${targetX}, ${endY}`;
   const centerX = (sourceX + targetX) / 2;
   const centerY = (startY + endY) / 2;
   const color = (data && data.orGroupColor) ? data.orGroupColor : '#ff8c00';
@@ -150,7 +156,7 @@ function OrLinkEdge({ id, sourceX, sourceY, targetX, targetY, data }) {
         id={id}
         style={{
           stroke: `url(#${gradientId})`,
-          strokeWidth: 2,
+          strokeWidth: isSunflowerSameGroup ? 2.4 : 2,
           pointerEvents: 'none',
           opacity,
           transition: 'opacity 1200ms cubic-bezier(0.22, 1, 0.36, 1)'

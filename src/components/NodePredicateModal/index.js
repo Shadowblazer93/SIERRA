@@ -9,7 +9,9 @@ import {
   LeftOutlined,
   RightOutlined,
   DragOutlined,
-  SortAscendingOutlined
+  SortAscendingOutlined,
+  UpOutlined,
+  DownOutlined
 } from '@ant-design/icons';
 import React, {useState, useContext, useMemo, useEffect, useCallback, useRef} from 'react';
 import CodeMirror from '@uiw/react-codemirror';
@@ -93,6 +95,14 @@ const moveItem = (arr, fromIndex, toIndex) => {
   const next = [...arr];
   const [item] = next.splice(fromIndex, 1);
   next.splice(toIndex, 0, item);
+  return next;
+};
+
+const swapItems = (arr, indexA, indexB) => {
+  const next = [...arr];
+  const temp = next[indexA];
+  next[indexA] = next[indexB];
+  next[indexB] = temp;
   return next;
 };
 
@@ -193,7 +203,8 @@ const EXPRESSION_TREE_LAYOUT = {
   bubbleSize: 22,
   operatorSize: 22,
   horizontalGap: 64,
-  verticalGap: 82
+  verticalGap: 82,
+  boundaryPadding: 10
 };
 
 const sanitizeExpressionNodeId = (value) => String(value).replace(/[^A-Za-z0-9_-]/g, '_');
@@ -265,6 +276,7 @@ const buildExpressionTreeAst = (orderedItems) => {
         id: item.id || `expr-leaf-${index}`,
         kind: 'leaf',
         attr: item.attr,
+        level: item.level,
         label: item.attr || item.label || item.expression,
         tooltip: item.tooltip || item.expression,
         connector: normalizeLogicalConnector(item.connector),
@@ -309,6 +321,8 @@ const annotateExpressionTree = (node, state = { leafIndex: 0 }) => {
 
 const ExpressionTreeNode = ({ data }) => {
   const [hovered, setHovered] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(false);
+  const controlsTimerRef = useRef(null);
   const isOperator = data.kind === 'operator';
   const bubbleSize = isOperator ? EXPRESSION_TREE_LAYOUT.operatorSize : EXPRESSION_TREE_LAYOUT.bubbleSize;
   const operatorLabel = normalizeLogicalConnector(data.label || data.operator || 'AND');
@@ -346,6 +360,12 @@ const ExpressionTreeNode = ({ data }) => {
       }
     : null;
 
+  useEffect(() => () => {
+    if (controlsTimerRef.current) {
+      window.clearTimeout(controlsTimerRef.current);
+    }
+  }, []);
+
   const handleOperatorClick = (event) => {
     if (!isOperator || typeof data.onToggle !== 'function') return;
     event.stopPropagation();
@@ -359,6 +379,37 @@ const ExpressionTreeNode = ({ data }) => {
     data.onDragStart(data.attr, event);
   };
 
+  const showLeafControls = () => {
+    if (controlsTimerRef.current) {
+      window.clearTimeout(controlsTimerRef.current);
+      controlsTimerRef.current = null;
+    }
+    setControlsVisible(true);
+  };
+
+  const hideLeafControls = () => {
+    if (controlsTimerRef.current) {
+      window.clearTimeout(controlsTimerRef.current);
+    }
+    controlsTimerRef.current = window.setTimeout(() => {
+      setControlsVisible(false);
+      controlsTimerRef.current = null;
+    }, 3000);
+  };
+
+  const handleLeafLevelChange = (delta, event) => {
+    if (typeof data.onAdjustLevel !== 'function') return;
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    data.onAdjustLevel(data.attr, delta);
+  };
+
+  const parsedLevel = Number.parseInt(data.level, 10);
+  const levelValue = Number.isFinite(parsedLevel) && parsedLevel >= 0 ? parsedLevel : 0;
+  const levelBadgeColor = NESTING_LEVEL_COLORS[levelValue % NESTING_LEVEL_COLORS.length];
+  const canIncreaseLevel = data.canIncreaseLevel !== false;
+  const canDecreaseLevel = data.canDecreaseLevel !== false;
+
   return (
     <div
       style={{
@@ -368,8 +419,14 @@ const ExpressionTreeNode = ({ data }) => {
         overflow: 'visible',
         pointerEvents: 'auto'
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={() => {
+        setHovered(true);
+        showLeafControls();
+      }}
+      onMouseLeave={() => {
+        setHovered(false);
+        hideLeafControls();
+      }}
     >
       <Handle type="target" position="top" style={{ opacity: 0, border: 0, background: 'transparent' }} />
       {isOperator ? (
@@ -395,25 +452,115 @@ const ExpressionTreeNode = ({ data }) => {
           {data.label}
         </div>
       ) : (
-        <Predicate
-          radius={Math.floor(bubbleSize / 2)}
-          position={{ x: 0, y: 0 }}
-          color={data.color}
-          title={data.title || data.label}
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            zIndex: 10,
-            border: '1px solid #111',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
-            cursor: 'grab',
-            userSelect: 'none',
-            touchAction: 'none'
-          }}
-          onMouseDown={handleLeafPointerDown}
-          onPointerDown={handleLeafPointerDown}
-        />
+        <>
+          <div
+            style={{
+              position: 'absolute',
+              left: -2,
+              top: -2,
+              width: 11,
+              height: 11,
+              borderRadius: '50%',
+              background: levelBadgeColor,
+              color: '#1f1f1f',
+              border: '1px solid rgba(0,0,0,0.28)',
+              fontSize: 7,
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+              zIndex: 14,
+              pointerEvents: 'none'
+            }}
+          >
+            {levelValue}
+          </div>
+          <Predicate
+            radius={Math.floor(bubbleSize / 2)}
+            position={{ x: 0, y: 0 }}
+            color={data.color}
+            title={data.title || data.label}
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              zIndex: data.isDragging ? 1000 : 10,
+              border: '1px solid #111',
+              boxShadow: data.isDragging
+                ? '0 0 0 3px rgba(22, 119, 255, 0.2), 0 8px 20px rgba(0, 0, 0, 0.35)'
+                : '0 1px 4px rgba(0,0,0,0.15)',
+              cursor: data.isDragging ? 'grabbing' : 'grab',
+              userSelect: 'none',
+              touchAction: 'none',
+              transition: 'box-shadow 100ms ease, z-index 100ms ease',
+              transform: data.isDragging 
+                ? `translate(${data.dragOffsetX || 0}px, ${data.dragOffsetY || 0}px)`
+                : 'translate(0, 0)',
+              willChange: data.isDragging ? 'transform' : 'auto'
+            }}
+            onMouseDown={handleLeafPointerDown}
+            onPointerDown={handleLeafPointerDown}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              left: bubbleSize + 6,
+              top: '50%',
+              transform: `translate(0, -50%) scale(${controlsVisible ? 1 : 0.96})`,
+              opacity: controlsVisible ? 1 : 0,
+              transition: 'opacity 180ms ease, transform 180ms ease',
+              pointerEvents: controlsVisible ? 'auto' : 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 1,
+              padding: 1,
+              borderRadius: 999,
+              background: 'rgba(255, 255, 255, 0.92)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              zIndex: 40
+            }}
+            onMouseEnter={showLeafControls}
+            onMouseLeave={hideLeafControls}
+          >
+            <Button
+              size="small"
+              shape="circle"
+              icon={<UpOutlined />}
+              aria-label="Increase nesting level"
+              title="Increase nesting level"
+              disabled={!canIncreaseLevel}
+              style={{ width: 14, height: 14, minWidth: 14, fontSize: 8, lineHeight: '12px' }}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onClick={(event) => handleLeafLevelChange(1, event)}
+            />
+            <Button
+              size="small"
+              shape="circle"
+              icon={<DownOutlined />}
+              aria-label="Decrease nesting level"
+              title="Decrease nesting level"
+              disabled={!canDecreaseLevel}
+              style={{ width: 14, height: 14, minWidth: 14, fontSize: 8, lineHeight: '12px' }}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onClick={(event) => handleLeafLevelChange(-1, event)}
+            />
+          </div>
+        </>
       )}
       {!isOperator && hovered && (
         <div
@@ -478,7 +625,28 @@ const ExpressionTreeDropSlotNode = ({ data }) => {
   );
 };
 
-const buildExpressionTreeGraph = (tree, attributes = [], onToggleOperator = null, onLeafDragStart = null) => {
+const ExpressionTreeBoundaryNode = ({ data }) => {
+  const isActive = !!data.active;
+  const isDragged = !!data.dragged;
+
+  return (
+    <div
+      style={{
+        width: Number.isFinite(data.width) ? data.width : 42,
+        height: Number.isFinite(data.height) ? data.height : 42,
+        borderRadius: 6,
+        border: `1px dashed ${isActive ? '#1677ff' : '#d9d9d9'}`,
+        background: isActive ? 'rgba(22, 119, 255, 0.08)' : 'rgba(255, 255, 255, 0.01)',
+        boxShadow: isActive ? '0 0 0 2px rgba(22, 119, 255, 0.12)' : 'none',
+        opacity: isDragged ? 0.08 : (isActive ? 0.95 : 0.12),
+        transition: 'opacity 160ms ease, background-color 160ms ease, box-shadow 160ms ease, border-color 160ms ease',
+        pointerEvents: 'none'
+      }}
+    />
+  );
+};
+
+const buildExpressionTreeGraph = (tree, attributes = [], onToggleOperator = null, onLeafDragStart = null, onAdjustLeafLevel = null) => {
   if (!tree) {
     return { elements: [], leafNodes: [], operatorNodes: [], nodeTypes: {} };
   }
@@ -517,9 +685,13 @@ const buildExpressionTreeGraph = (tree, attributes = [], onToggleOperator = null
         data: {
           kind: 'leaf',
           attr: current.attr,
+          level: current.level,
+          canIncreaseLevel: current.canIncreaseLevel,
+          canDecreaseLevel: current.canDecreaseLevel,
           label: current.label,
           title: current.tooltip || current.label,
           onDragStart: onLeafDragStart,
+          onAdjustLevel: onAdjustLeafLevel,
           color: getPredicateTreeColor(current.attr, attributes)
         },
         draggable: false,
@@ -622,7 +794,7 @@ const buildExpressionTreeGraph = (tree, attributes = [], onToggleOperator = null
     operatorNodes,
     nodeTypes: {
       expressionBubbleNode: ExpressionTreeNode,
-      expressionDropSlotNode: ExpressionTreeDropSlotNode
+      expressionBoundaryNode: ExpressionTreeBoundaryNode
     }
   };
 };
@@ -652,7 +824,8 @@ const NodePredicateModal = ({
   const [nestingDrawerVisible, setNestingDrawerVisible] = useState(false);
   const [draggedAttr, setDraggedAttr] = useState('');
   const [dropTargetAttr, setDropTargetAttr] = useState('');
-  const [treeDragState, setTreeDragState] = useState({ attr: '', slotId: null });
+  const [treeDropTargetAttr, setTreeDropTargetAttr] = useState('');
+  const [treeDragState, setTreeDragState] = useState({ attr: '', slotId: null, dragStartX: 0, dragStartY: 0, currentX: 0, currentY: 0 });
   const [expressionTreeInstance, setExpressionTreeInstance] = useState(null);
   const expressionTreeContainerRef = useRef(null);
   const [state, dispatch] = useContext(Context);
@@ -669,7 +842,8 @@ const NodePredicateModal = ({
     setNestingDrawerVisible(false);
     setDraggedAttr('');
     setDropTargetAttr('');
-    setTreeDragState({ attr: '', slotId: null });
+    setTreeDropTargetAttr('');
+    setTreeDragState({ attr: '', slotId: null, dragStartX: 0, dragStartY: 0, currentX: 0, currentY: 0 });
     setExpressionTreeInstance(null);
   }, [visible]);
 
@@ -806,12 +980,19 @@ const NodePredicateModal = ({
       const expression = attrExpressionMap[attr];
       if (!expression) return;
 
+      const index = normalizedNesting.order.indexOf(attr);
+      const level = normalizedNesting.levels[attr] || 0;
+      const prevAttr = index > 0 ? normalizedNesting.order[index - 1] : null;
+      const maxLevel = index > 0 ? ((normalizedNesting.levels[prevAttr] || 0) + 1) : Number.POSITIVE_INFINITY;
+
       orderedItems.push({
         expression,
         attr,
         label: attr,
         tooltip: expression,
-        level: normalizedNesting.levels[attr] || 0,
+        level,
+        canIncreaseLevel: index === 0 || level < maxLevel,
+        canDecreaseLevel: level > 0,
         connector: normalizedNesting.modes[attr] || 'AND'
       });
     });
@@ -830,163 +1011,79 @@ const NodePredicateModal = ({
       event?.preventDefault?.();
       event?.stopPropagation?.();
       setTreeDragState({ attr, slotId: null });
-    });
+    }, shiftIndentation);
   }, [nodePredicatePreview.tree, attributes, togglePredicateMode]);
 
-  const expressionTreeDropSlots = useMemo(() => {
-    const draggedAttrForTree = treeDragState.attr;
-    if (!draggedAttrForTree) return [];
+  const getLeafBoundaryRect = useCallback((leaf) => {
+    if (!leaf) return null;
 
-    const availableLeafNodes = (expressionTreeGraph.leafNodes || []).filter((leaf) => leaf.attr !== draggedAttrForTree);
-    if (availableLeafNodes.length === 0) return [];
+    const padding = EXPRESSION_TREE_LAYOUT.boundaryPadding;
+    const width = (leaf.width || EXPRESSION_TREE_LAYOUT.bubbleSize) + (padding * 2);
+    const height = (leaf.height || EXPRESSION_TREE_LAYOUT.bubbleSize) + (padding * 2);
 
-    const slots = [];
-    const baseColors = ['#e6f7ff', '#f9f0ff', '#fff1f0', '#f6ffed', '#fff7e6'];
-    const borderColors = ['#91d5ff', '#d3adf7', '#ffa39e', '#b7eb8f', '#ffd591'];
+    return {
+      left: (leaf.x || 0) - padding,
+      top: (leaf.y || 0) - padding,
+      width,
+      height,
+      right: (leaf.x || 0) - padding + width,
+      bottom: (leaf.y || 0) - padding + height
+    };
+  }, []);
 
-    const orderIndex = {};
-    normalizedNesting.order.forEach((attr, idx) => {
-      orderIndex[attr] = idx;
-    });
+  const treeBoundaryElements = useMemo(() => {
+    if (!treeDragState.attr) return [];
 
-    (expressionTreeGraph.operatorNodes || []).forEach((operatorNode, operatorIndex) => {
-      const operatorAttrs = (operatorNode.leafAttrs || [])
-        .filter((attr) => attr && attr !== draggedAttrForTree)
-        .filter((attr, idx, arr) => arr.indexOf(attr) === idx)
-        .sort((a, b) => (orderIndex[a] ?? Number.MAX_SAFE_INTEGER) - (orderIndex[b] ?? Number.MAX_SAFE_INTEGER));
+    return (expressionTreeGraph.leafNodes || []).map((leaf) => {
+      const boundary = getLeafBoundaryRect(leaf);
+      if (!boundary) return null;
 
-      if (operatorAttrs.length === 0) return;
-
-      const targetLeafNodes = availableLeafNodes.filter((leaf) => operatorAttrs.includes(leaf.attr));
-      if (targetLeafNodes.length === 0) return;
-
-      const targetIndexes = operatorAttrs
-        .map((attr) => normalizedNesting.order.indexOf(attr))
-        .filter((idx) => idx >= 0);
-      if (targetIndexes.length === 0) return;
-
-      const minLevel = operatorAttrs.reduce((lowest, attr) => {
-        const level = Number.parseInt(normalizedNesting.levels[attr], 10) || 0;
-        return Math.min(lowest, level);
-      }, Number.MAX_SAFE_INTEGER);
-      const baseLevel = Number.isFinite(minLevel) && minLevel !== Number.MAX_SAFE_INTEGER ? minLevel : 0;
-
-      const minX = Math.min(...targetLeafNodes.map((leaf) => leaf.x));
-      const maxX = Math.max(...targetLeafNodes.map((leaf) => leaf.x + leaf.width));
-      const minY = Math.min(...targetLeafNodes.map((leaf) => leaf.y));
-      const maxY = Math.max(...targetLeafNodes.map((leaf) => leaf.y + leaf.height));
-
-      const groupPaddingX = 14;
-      const groupPaddingY = 12;
-      const left = minX - groupPaddingX;
-      const right = maxX + groupPaddingX;
-      const top = minY - groupPaddingY;
-      const bottom = maxY + groupPaddingY;
-
-      const paletteIndex = operatorIndex % baseColors.length;
-      const targetInsertIndex = Math.max(...targetIndexes) + 1;
-      const nestWidth = Math.max(88, Math.min(160, right - left));
-
-      slots.push({
-        id: `group-${operatorNode.id}`,
-        type: 'group',
-        targetOperatorId: operatorNode.id,
-        index: targetInsertIndex,
-        targetLevel: baseLevel,
-        x: (left + right) / 2,
-        y: (top + bottom) / 2,
-        width: Math.max(68, right - left),
-        height: Math.max(34, bottom - top),
-        left,
-        right,
-        top,
-        bottom,
-        background: baseColors[paletteIndex],
-        border: borderColors[paletteIndex],
-        label: 'DROP IN GROUP'
-      });
-
-      slots.push({
-        id: `nest-group-${operatorNode.id}`,
-        type: 'nest-group',
-        targetOperatorId: operatorNode.id,
-        index: targetInsertIndex,
-        targetLevel: baseLevel + 1,
-        x: (left + right) / 2,
-        y: bottom + 26,
-        width: nestWidth,
-        height: 24,
-        left: ((left + right) / 2) - (nestWidth / 2),
-        right: ((left + right) / 2) + (nestWidth / 2),
-        top: bottom + 14,
-        bottom: bottom + 38,
-        background: baseColors[paletteIndex],
-        border: borderColors[paletteIndex],
-        label: 'DROP BELOW'
-      });
-    });
-
-    return slots;
-  }, [expressionTreeGraph.leafNodes, expressionTreeGraph.operatorNodes, normalizedNesting.levels, normalizedNesting.order, treeDragState.attr]);
-
-  const activeExpressionTreeDropSlot = useMemo(() => {
-    const slotId = treeDragState.slotId;
-    if (!slotId) return null;
-    return expressionTreeDropSlots.find((slot) => slot.id === slotId) || null;
-  }, [expressionTreeDropSlots, treeDragState.slotId]);
+      return {
+        id: `expression-boundary-${leaf.id}`,
+        type: 'expressionBoundaryNode',
+        position: { x: boundary.left, y: boundary.top },
+        data: {
+          width: boundary.width,
+          height: boundary.height,
+          active: treeDropTargetAttr === leaf.attr,
+          dragged: leaf.attr === treeDragState.attr
+        },
+        draggable: false,
+        selectable: false,
+        connectable: false,
+        style: { width: boundary.width, height: boundary.height }
+      };
+    }).filter(Boolean);
+  }, [expressionTreeGraph.leafNodes, getLeafBoundaryRect, treeDragState.attr, treeDropTargetAttr]);
 
   const expressionTreeElements = useMemo(() => {
     if (!treeDragState.attr) return [...expressionTreeGraph.elements];
 
-    const slotElements = expressionTreeDropSlots.map((slot) => {
-      const slotWidth = Number.isFinite(slot.width) ? slot.width : 54;
-      const slotHeight = Number.isFinite(slot.height) ? slot.height : 26;
-      return {
-        id: `expression-drop-slot-${slot.id}`,
-        type: 'expressionDropSlotNode',
-        position: { x: slot.x - (slotWidth / 2), y: slot.y - (slotHeight / 2) },
-        data: {
-          active: slot.id === treeDragState.slotId,
-          width: slotWidth,
-          height: slotHeight,
-          label: slot.label,
-          palette: {
-            background: slot.background,
-            border: slot.border
+    const offsetElements = treeDragState.attr ? expressionTreeGraph.elements.map((elem) => {
+      if (elem.type === 'expressionBubbleNode' && elem.data?.attr === treeDragState.attr) {
+        const offsetX = treeDragState.currentX - treeDragState.dragStartX;
+        const offsetY = treeDragState.currentY - treeDragState.dragStartY;
+        return {
+          ...elem,
+          data: {
+            ...elem.data,
+            isDragging: true,
+            dragOffsetX: offsetX,
+            dragOffsetY: offsetY
           }
-        },
-        selectable: false,
-        draggable: false,
-        connectable: false,
-        style: { width: slotWidth, height: slotHeight }
-      };
-    });
+        };
+      }
+      return elem;
+    }) : expressionTreeGraph.elements;
 
-    const activeSlotEdges = [];
-    const aslot = activeExpressionTreeDropSlot;
-    if (aslot && aslot.type === 'nest-group') {
-      // show edge from target operator down to slot
-      activeSlotEdges.push({
-        id: `expression-drop-slot-edge-nest-group-${aslot.id}`,
-        source: aslot.targetOperatorId,
-        target: `expression-drop-slot-${aslot.id}`,
-        type: 'step',
-        style: {
-          stroke: aslot.border,
-          strokeWidth: 2,
-          strokeDasharray: '4,4'
-        }
-      });
-    }
-
-    return [...expressionTreeGraph.elements, ...slotElements, ...activeSlotEdges];
-  }, [activeExpressionTreeDropSlot, expressionTreeDropSlots, expressionTreeGraph.elements, treeDragState.attr, treeDragState.slotId]);
+    return [...treeBoundaryElements, ...offsetElements];
+  }, [expressionTreeGraph.elements, treeBoundaryElements, treeDragState.attr, treeDragState.dragStartX, treeDragState.dragStartY, treeDragState.currentX, treeDragState.currentY]);
 
   const previewQueryText = nodePredicatePreview.preview
     ? `WHERE ${nodePredicatePreview.preview}`
     : '-- No valid predicates for this node --';
 
-  const shiftIndentation = (attr, delta) => {
+  function shiftIndentation(attr, delta) {
     const index = normalizedNesting.order.indexOf(attr);
     if (index < 0) return;
 
@@ -1008,7 +1105,7 @@ const NodePredicateModal = ({
     };
     const clamped = clampLevelsToOrder(normalizedNesting.order, nextLevels);
     persistNestingState({ order: normalizedNesting.order, levels: clamped, modes: normalizedNesting.modes });
-  };
+  }
 
   const handleDropOnAttribute = (targetAttr) => {
     if (!draggedAttr || draggedAttr === targetAttr) {
@@ -1032,43 +1129,20 @@ const NodePredicateModal = ({
     setDraggedAttr('');
   };
 
-  const getNearestExpressionTreeSlotIndex = useCallback((draggedNode) => {
-    if (!draggedNode || !treeDragState.attr || expressionTreeDropSlots.length === 0) return null;
+  const findTreeDropTarget = useCallback((point) => {
+    if (!point || !treeDragState.attr) return '';
 
-    const leafNode = (expressionTreeGraph.leafNodes || []).find((leaf) => leaf.attr === treeDragState.attr);
-    const nodeWidth = leafNode?.width || EXPRESSION_TREE_LAYOUT.bubbleSize;
-    const nodeHeight = leafNode?.height || EXPRESSION_TREE_LAYOUT.bubbleSize;
-    const dragCenterX = (draggedNode.position?.x || 0) + nodeWidth / 2;
-    const dragCenterY = (draggedNode.position?.y || 0) + nodeHeight / 2;
-
-    let nearestSlot = expressionTreeDropSlots[0];
-    let nearestDistance = Infinity;
-
-    expressionTreeDropSlots.forEach((slot) => {
-      const distance = Math.hypot(slot.x - dragCenterX, slot.y - dragCenterY);
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestSlot = slot;
+    for (const leaf of expressionTreeGraph.leafNodes || []) {
+      if (leaf.attr === treeDragState.attr) continue;
+      const boundary = getLeafBoundaryRect(leaf);
+      if (!boundary) continue;
+      if (point.x >= boundary.left && point.x <= boundary.right && point.y >= boundary.top && point.y <= boundary.bottom) {
+        return leaf.attr;
       }
-    });
+    }
 
-    return nearestSlot?.index ?? null;
-  }, [expressionTreeDropSlots, expressionTreeGraph.leafNodes, treeDragState.attr]);
-
-  const getPointToExpressionTreeSlotDistance = useCallback((slot, point) => {
-    if (!slot || !point) return Number.POSITIVE_INFINITY;
-
-    const left = Number.isFinite(slot.left) ? slot.left : (slot.x - ((slot.width || 54) / 2));
-    const right = Number.isFinite(slot.right) ? slot.right : (slot.x + ((slot.width || 54) / 2));
-    const top = Number.isFinite(slot.top) ? slot.top : (slot.y - ((slot.height || 26) / 2));
-    const bottom = Number.isFinite(slot.bottom) ? slot.bottom : (slot.y + ((slot.height || 26) / 2));
-
-    const dx = point.x < left ? (left - point.x) : (point.x > right ? point.x - right : 0);
-    const dy = point.y < top ? (top - point.y) : (point.y > bottom ? point.y - bottom : 0);
-
-    if (dx === 0 && dy === 0) return 0;
-    return Math.hypot(dx, dy);
-  }, []);
+    return '';
+  }, [expressionTreeGraph.leafNodes, getLeafBoundaryRect, treeDragState.attr]);
 
   const handleExpressionTreePointerMove = useCallback((event) => {
     if (!treeDragState.attr || !expressionTreeInstance || !expressionTreeContainerRef.current) return;
@@ -1084,65 +1158,53 @@ const NodePredicateModal = ({
           y: event.clientY - rect.top
         };
 
-    let nearestSlot = null;
-    let nearestDistance = Infinity;
-
-    expressionTreeDropSlots.forEach((slot) => {
-      const distance = getPointToExpressionTreeSlotDistance(slot, flowPoint);
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestSlot = slot;
-      }
-    });
-
-    const hoveredSlotId = nearestDistance === 0 ? (nearestSlot?.id ?? null) : null;
-
     setTreeDragState((current) => ({
       ...current,
-      slotId: hoveredSlotId
+      currentX: flowPoint.x,
+      currentY: flowPoint.y,
+      slotId: null
     }));
-  }, [expressionTreeDropSlots, expressionTreeInstance, getPointToExpressionTreeSlotDistance, treeDragState.attr]);
+    setTreeDropTargetAttr(findTreeDropTarget(flowPoint));
+  }, [expressionTreeInstance, findTreeDropTarget, treeDragState.attr]);
 
   const handleExpressionTreePointerUp = useCallback(() => {
-    if (!treeDragState.attr || !treeDragState.slotId) {
-      setTreeDragState({ attr: '', slotId: null });
+    if (!treeDragState.attr) {
+      setTreeDragState({ attr: '', slotId: null, dragStartX: 0, dragStartY: 0, currentX: 0, currentY: 0 });
+      setTreeDropTargetAttr('');
       return;
     }
 
-    const fromIndex = normalizedNesting.order.indexOf(treeDragState.attr);
-    const slot = expressionTreeDropSlots.find((s) => s.id === treeDragState.slotId);
-    if (!slot) {
-      setTreeDragState({ attr: '', slotId: null });
+    const draggedLeaf = (expressionTreeGraph.leafNodes || []).find((leaf) => leaf.attr === treeDragState.attr);
+    if (!draggedLeaf) {
+      setTreeDragState({ attr: '', slotId: null, dragStartX: 0, dragStartY: 0, currentX: 0, currentY: 0 });
+      setTreeDropTargetAttr('');
       return;
     }
 
-    if (slot.type === 'group') {
-      const targetIndex = slot.index;
-      if (fromIndex >= 0 && targetIndex !== null && targetIndex !== undefined) {
-        const reordered = moveItem(normalizedNesting.order, fromIndex, targetIndex);
+    if (treeDropTargetAttr) {
+      const fromIndex = normalizedNesting.order.indexOf(treeDragState.attr);
+      const toIndex = normalizedNesting.order.indexOf(treeDropTargetAttr);
+      if (fromIndex >= 0 && toIndex >= 0 && fromIndex !== toIndex) {
+        const reordered = swapItems(normalizedNesting.order, fromIndex, toIndex);
+        const targetAttr = treeDropTargetAttr;
         const nextLevels = {
           ...normalizedNesting.levels,
-          [treeDragState.attr]: slot.targetLevel
+          [treeDragState.attr]: normalizedNesting.levels[targetAttr] || 0,
+          [targetAttr]: normalizedNesting.levels[treeDragState.attr] || 0
+        };
+        const nextModes = {
+          ...normalizedNesting.modes,
+          [treeDragState.attr]: normalizedNesting.modes[targetAttr] || 'AND',
+          [targetAttr]: normalizedNesting.modes[treeDragState.attr] || 'AND'
         };
         const clampedLevels = clampLevelsToOrder(reordered, nextLevels);
-        persistNestingState({ order: reordered, levels: clampedLevels, modes: normalizedNesting.modes });
-      }
-    } else if (slot.type === 'nest-group') {
-      const targetIndex = slot.index;
-      if (fromIndex >= 0 && targetIndex !== null && targetIndex !== undefined) {
-        const desiredIndex = targetIndex;
-        const reordered = moveItem(normalizedNesting.order, fromIndex, desiredIndex);
-        const nextLevels = {
-          ...normalizedNesting.levels,
-          [treeDragState.attr]: slot.targetLevel
-        };
-        const clampedLevels = clampLevelsToOrder(reordered, nextLevels);
-        persistNestingState({ order: reordered, levels: clampedLevels, modes: normalizedNesting.modes });
+        persistNestingState({ order: reordered, levels: clampedLevels, modes: nextModes });
       }
     }
 
-    setTreeDragState({ attr: '', slotId: null });
-  }, [normalizedNesting.levels, normalizedNesting.order, normalizedNesting.modes, treeDragState.attr, treeDragState.slotId, expressionTreeDropSlots]);
+    setTreeDragState({ attr: '', slotId: null, dragStartX: 0, dragStartY: 0, currentX: 0, currentY: 0 });
+    setTreeDropTargetAttr('');
+  }, [expressionTreeGraph.leafNodes, normalizedNesting.levels, normalizedNesting.order, normalizedNesting.modes, treeDragState.attr, treeDropTargetAttr]);
 
   useEffect(() => {
     if (!treeDragState.attr) return undefined;
@@ -1162,11 +1224,21 @@ const NodePredicateModal = ({
   }, [handleExpressionTreePointerMove, handleExpressionTreePointerUp, treeDragState.attr]);
 
   const startLeafDrag = useCallback((attr, event) => {
-    if (!attr) return;
+    if (!attr || !expressionTreeContainerRef.current || !expressionTreeInstance) return;
     event?.preventDefault?.();
     event?.stopPropagation?.();
-    setTreeDragState({ attr, slotId: null });
-  }, [normalizedNesting.order]);
+    const rect = expressionTreeContainerRef.current.getBoundingClientRect();
+    const flowPoint = typeof expressionTreeInstance.project === 'function'
+      ? expressionTreeInstance.project({
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top
+        })
+      : {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top
+        };
+    setTreeDragState({ attr, slotId: null, dragStartX: flowPoint.x, dragStartY: flowPoint.y, currentX: flowPoint.x, currentY: flowPoint.y });
+  }, [expressionTreeInstance]);
 
   const showChildrenDrawer = (attr) => {
     setChildDrawer({
@@ -1328,12 +1400,16 @@ const NodePredicateModal = ({
                   <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, gap: 8 }}>
                     <span
                       style={{
-                        width: 10,
-                        height: 10,
+                        width: 16,
+                        height: 16,
                         borderRadius: '50%',
-                        backgroundColor: colour.primary,
-                        border: `1px solid ${colour.secondary}`,
-                        flexShrink: 0
+                        backgroundColor: colour.secondary,
+                        border: `1px solid #111`,
+                        flexShrink: 0,
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
                       }}
                     />
                     <span
@@ -1605,6 +1681,7 @@ const NodePredicateModal = ({
               const mode = normalizePredicateMode(normalizedNesting.modes[attr]);
               const relationAttrs = relationshipMap[attr] || [];
               const levelColor = NESTING_LEVEL_COLORS[level % NESTING_LEVEL_COLORS.length];
+              const predicateColour = getPredicateTreeColor(attr, attributes);
               const indentOffset = Math.min(level, 6) * 12;
               const isDropTarget = dropTargetAttr === attr && draggedAttr && draggedAttr !== attr;
               const canIndentRight = index === 0 || level < ((normalizedNesting.levels[normalizedNesting.order[index - 1]] || 0) + 1);
@@ -1697,6 +1774,20 @@ const NodePredicateModal = ({
                       }}>
                         {attr}
                       </span>
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          width: 22,
+                          height: 22,
+                          minWidth: 22,
+                          marginLeft: 8,
+                          borderRadius: '50%',
+                          backgroundColor: predicateColour.secondary,
+                          border: '1px solid #111',
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+                          flexShrink: 0
+                        }}
+                      />
                     </div>
 
                     <div style={{ minHeight: 24, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>

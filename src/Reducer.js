@@ -59,6 +59,11 @@ const Reducer = (state, action) => {
         ...state,
         predDisplayStatus: action.payload
       };
+    case 'SET_OR_REPRESENTATION':
+      return {
+        ...state,
+        orRepresentation: action.payload
+      };
     case 'SET_DATA':
       console.log('SETTING DATA');
       return {

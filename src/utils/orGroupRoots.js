@@ -53,22 +53,61 @@ const getNestingOrPairs = (nodes = []) => {
     const levels = normalized.levels || {};
     const modes = normalized.modes || {};
 
+    // Create pairs for OR connections at the same nesting level
     for (let i = 1; i < order.length; i += 1) {
       const currentAttr = order[i];
       const prevAttr = order[i - 1];
-      const connector = normalizePredicateMode(modes[currentAttr]);
-      if (connector !== 'OR') continue;
+      // Connector semantics are on the current item (linking prev -> current).
+      // The first item's mode is non-semantic and must not break OR grouping.
+      const currentMode = normalizePredicateMode(modes[currentAttr]);
+      if (currentMode !== 'OR') continue;
 
       const currentLevel = Number.parseInt(levels[currentAttr], 10) || 0;
       const prevLevel = Number.parseInt(levels[prevAttr], 10) || 0;
 
-      // Keep OR unions local to sibling items in the same bracket level.
-      if (currentLevel !== prevLevel) continue;
+      // Connect same-level siblings
+      if (currentLevel === prevLevel) {
+        pairs.push([
+          `${nodeId}_${prevAttr}`,
+          `${nodeId}_${currentAttr}`
+        ]);
+      }
+      // Connect parent level to child level when parent has OR mode
+      else if (prevLevel < currentLevel && currentLevel === prevLevel + 1) {
+        pairs.push([
+          `${nodeId}_${prevAttr}`,
+          `${nodeId}_${currentAttr}`
+        ]);
+      }
+    }
 
-      pairs.push([
-        `${nodeId}_${prevAttr}`,
-        `${nodeId}_${currentAttr}`
-      ]);
+    // Also handle the case where a parent OR connects to multiple children at the next level
+    // by creating pairs between the first and last child at each level
+    for (let level = 0; level < Math.max(...Object.values(levels)); level++) {
+      const itemsAtLevel = order.filter(attr => (Number.parseInt(levels[attr], 10) || 0) === level);
+      const itemsAtNextLevel = order.filter(attr => (Number.parseInt(levels[attr], 10) || 0) === level + 1);
+      
+      if (itemsAtLevel.length > 0 && itemsAtNextLevel.length > 1) {
+        // If the last item at the current level has OR mode, connect its children
+        const lastAtLevel = itemsAtLevel[itemsAtLevel.length - 1];
+        const lastAtLevelMode = normalizePredicateMode(modes[lastAtLevel]);
+        
+        if (lastAtLevelMode === 'OR' && itemsAtNextLevel.length > 1) {
+          // Connect all children at the next level to form a group
+          for (let j = 1; j < itemsAtNextLevel.length; j++) {
+            const prevChild = itemsAtNextLevel[j - 1];
+            const currChild = itemsAtNextLevel[j];
+            const currChildMode = normalizePredicateMode(modes[currChild]);
+            
+            if (currChildMode === 'OR') {
+              pairs.push([
+                `${nodeId}_${prevChild}`,
+                `${nodeId}_${currChild}`
+              ]);
+            }
+          }
+        }
+      }
     }
   });
 

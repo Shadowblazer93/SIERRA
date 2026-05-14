@@ -221,6 +221,13 @@ const buildExpressionTreeAst = (orderedItems) => {
 
   let operatorCounter = 0;
 
+  const getLeftmostLeafAttr = (node) => {
+    if (!node) return undefined;
+    if (node.attr) return node.attr;
+    if (!Array.isArray(node.children) || node.children.length === 0) return undefined;
+    return getLeftmostLeafAttr(node.children[0]);
+  };
+
   const buildOperatorChain = (tokens = [], fallbackOperator = 'AND', idPrefix = 'expr-op') => {
     if (!Array.isArray(tokens) || tokens.length === 0) return null;
     if (tokens.length === 1) return tokens[0].node;
@@ -234,7 +241,8 @@ const buildExpressionTreeAst = (orderedItems) => {
         kind: 'operator',
         label: operator,
         operator,
-        toggleAttr: token?.node?.attr,
+        // Operator connector belongs to the first predicate inside the right token subtree.
+        toggleAttr: getLeftmostLeafAttr(token?.node),
         children: [current, token.node]
       };
     }
@@ -372,6 +380,13 @@ const ExpressionTreeNode = ({ data }) => {
     data.onToggle(data.toggleAttr);
   };
 
+  const handleOperatorLevelChange = (delta, event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    if (!isOperator || typeof data.onAdjustSubtreeLevels !== 'function') return;
+    data.onAdjustSubtreeLevels(data.leafAttrs || [], delta);
+  };
+
   const handleLeafPointerDown = (event) => {
     if (isOperator || typeof data.onDragStart !== 'function') return;
     event.preventDefault();
@@ -430,27 +445,101 @@ const ExpressionTreeNode = ({ data }) => {
     >
       <Handle type="target" position="top" style={{ opacity: 0, border: 0, background: 'transparent' }} />
       {isOperator ? (
-        <div
-          role="button"
-          tabIndex={0}
-          style={{
-            ...circleStyle,
-            cursor: 'pointer',
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            zIndex: 10,
-            pointerEvents: 'auto'
-          }}
-          onClick={handleOperatorClick}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              handleOperatorClick(event);
-            }
-          }}
-        >
-          {data.label}
-        </div>
+        <>
+          <div
+            role="button"
+            tabIndex={0}
+            style={{
+              ...circleStyle,
+              cursor: 'pointer',
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              zIndex: 10,
+              pointerEvents: 'auto'
+            }}
+            onClick={handleOperatorClick}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                handleOperatorClick(event);
+              }
+            }}
+          >
+            {data.label}
+          </div>
+          <div
+            style={{
+              position: 'absolute',
+              left: bubbleSize + 6,
+              top: '50%',
+              transform: `translate(0, -50%) scale(${controlsVisible ? 1 : 0.96})`,
+              opacity: controlsVisible ? 1 : 0,
+              transition: 'opacity 180ms ease, transform 180ms ease',
+              pointerEvents: controlsVisible ? 'auto' : 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 1,
+              padding: 1,
+              borderRadius: 999,
+              background: 'rgba(255, 255, 255, 0.92)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              zIndex: 40
+            }}
+            onMouseEnter={showLeafControls}
+            onMouseLeave={hideLeafControls}
+          >
+            <Button
+              size="small"
+              shape="circle"
+              icon={<UpOutlined style={{ color: '#ffffff', fontSize: 8 }} />}
+              aria-label="Increase subtree nesting"
+              title="Increase subtree nesting"
+              style={{
+                width: 14,
+                height: 14,
+                minWidth: 14,
+                lineHeight: '12px',
+                background: operatorPalette.background,
+                borderColor: operatorPalette.border,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+              }}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onClick={(event) => handleOperatorLevelChange(1, event)}
+            />
+            <Button
+              size="small"
+              shape="circle"
+              icon={<DownOutlined style={{ color: '#ffffff', fontSize: 8 }} />}
+              aria-label="Decrease subtree nesting"
+              title="Decrease subtree nesting"
+              style={{
+                width: 14,
+                height: 14,
+                minWidth: 14,
+                lineHeight: '12px',
+                background: operatorPalette.background,
+                borderColor: operatorPalette.border,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+              }}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onClick={(event) => handleOperatorLevelChange(-1, event)}
+            />
+          </div>
+        </>
       ) : (
         <>
           <div
@@ -526,11 +615,19 @@ const ExpressionTreeNode = ({ data }) => {
             <Button
               size="small"
               shape="circle"
-              icon={<UpOutlined />}
+              icon={<UpOutlined style={{ color: '#ffffff', fontSize: 8 }} />}
               aria-label="Increase nesting level"
               title="Increase nesting level"
               disabled={!canIncreaseLevel}
-              style={{ width: 14, height: 14, minWidth: 14, fontSize: 8, lineHeight: '12px' }}
+              style={{
+                width: 14,
+                height: 14,
+                minWidth: 14,
+                lineHeight: '12px',
+                background: '#4d5a6a',
+                borderColor: '#4d5a6a',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+              }}
               onMouseDown={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -544,11 +641,19 @@ const ExpressionTreeNode = ({ data }) => {
             <Button
               size="small"
               shape="circle"
-              icon={<DownOutlined />}
+              icon={<DownOutlined style={{ color: '#ffffff', fontSize: 8 }} />}
               aria-label="Decrease nesting level"
               title="Decrease nesting level"
               disabled={!canDecreaseLevel}
-              style={{ width: 14, height: 14, minWidth: 14, fontSize: 8, lineHeight: '12px' }}
+              style={{
+                width: 14,
+                height: 14,
+                minWidth: 14,
+                lineHeight: '12px',
+                background: '#4d5a6a',
+                borderColor: '#4d5a6a',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+              }}
               onMouseDown={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -646,7 +751,7 @@ const ExpressionTreeBoundaryNode = ({ data }) => {
   );
 };
 
-const buildExpressionTreeGraph = (tree, attributes = [], onToggleOperator = null, onLeafDragStart = null, onAdjustLeafLevel = null) => {
+const buildExpressionTreeGraph = (tree, attributes = [], onToggleOperator = null, onLeafDragStart = null, onAdjustLeafLevel = null, onAdjustSubtreeLevels = null) => {
   if (!tree) {
     return { elements: [], leafNodes: [], operatorNodes: [], nodeTypes: {} };
   }
@@ -731,7 +836,9 @@ const buildExpressionTreeGraph = (tree, attributes = [], onToggleOperator = null
         title: current.operator || current.label || 'AND',
         operator: current.operator || current.label || 'AND',
         toggleAttr: current.toggleAttr,
-        onToggle: onToggleOperator
+        onToggle: onToggleOperator,
+        onAdjustSubtreeLevels,
+        leafAttrs: childLayouts.flatMap((child) => child?.leafAttrs || [])
       },
       draggable: false,
       selectable: false,
@@ -1011,8 +1118,8 @@ const NodePredicateModal = ({
       event?.preventDefault?.();
       event?.stopPropagation?.();
       setTreeDragState({ attr, slotId: null });
-    }, shiftIndentation);
-  }, [nodePredicatePreview.tree, attributes, togglePredicateMode]);
+    }, shiftIndentation, shiftSubtreeIndentation);
+  }, [nodePredicatePreview.tree, attributes, togglePredicateMode, shiftSubtreeIndentation]);
 
   const getLeafBoundaryRect = useCallback((leaf) => {
     if (!leaf) return null;
@@ -1105,6 +1212,27 @@ const NodePredicateModal = ({
     };
     const clamped = clampLevelsToOrder(normalizedNesting.order, nextLevels);
     persistNestingState({ order: normalizedNesting.order, levels: clamped, modes: normalizedNesting.modes });
+  }
+
+  function shiftSubtreeIndentation(subtreeAttrs, delta) {
+    const step = Number(delta) || 0;
+    if (!Array.isArray(subtreeAttrs) || subtreeAttrs.length === 0) return;
+    if (step !== 1 && step !== -1) return;
+
+    const order = normalizedNesting.order || [];
+    const attrSet = new Set(order);
+    const targetSet = new Set(subtreeAttrs.filter((attr) => attrSet.has(attr)));
+    if (targetSet.size === 0) return;
+
+    const nextLevels = { ...normalizedNesting.levels };
+    order.forEach((attr) => {
+      if (!targetSet.has(attr)) return;
+      const currentLevel = Number.parseInt(nextLevels[attr], 10) || 0;
+      nextLevels[attr] = Math.max(0, currentLevel + step);
+    });
+
+    const clampedLevels = clampLevelsToOrder(order, nextLevels);
+    persistNestingState({ order, levels: clampedLevels, modes: normalizedNesting.modes });
   }
 
   const handleDropOnAttribute = (targetAttr) => {

@@ -37,6 +37,37 @@ const hexToRgba = (hex, alpha) => {
   return `rgba(0, 0, 0, ${alpha})`;
 };
 
+const lightenHexColor = (hex, nestingLevel) => {
+  if (!hex || nestingLevel <= 0) return hex;
+  
+  const normalized = hex.replace('#', '');
+  const parse = (value) => parseInt(value, 16);
+  let r, g, b;
+  
+  if (normalized.length === 3) {
+    r = parse(normalized[0] + normalized[0]);
+    g = parse(normalized[1] + normalized[1]);
+    b = parse(normalized[2] + normalized[2]);
+  } else if (normalized.length === 6) {
+    r = parse(normalized.slice(0, 2));
+    g = parse(normalized.slice(2, 4));
+    b = parse(normalized.slice(4, 6));
+  } else {
+    return hex;
+  }
+  
+  // Apply whitening effect - stronger visual separation for each nesting jump.
+  // Each level adds 38% more white overlay (capped at 85%).
+  const whiteOverlay = Math.min(0.85, nestingLevel * 0.38);
+  
+  const lightR = Math.round(r + (255 - r) * whiteOverlay);
+  const lightG = Math.round(g + (255 - g) * whiteOverlay);
+  const lightB = Math.round(b + (255 - b) * whiteOverlay);
+  
+  const toHex = (value) => Math.round(value).toString(16).padStart(2, '0');
+  return `#${toHex(lightR)}${toHex(lightG)}${toHex(lightB)}`;
+};
+
 const darkenHsl = (hslStr, deltaLightness = 8) => {
   try {
     const m = /hsl\((\d+),\s*(\d+)%\,\s*(\d+)%\)/.exec(hslStr);
@@ -252,6 +283,14 @@ function Node(props) {
     }
     return buildOrGroupRoots(state.nodes, state.orLinks);
   }, [props.data?.orGroupRoots, state.nodes, state.orLinks]);
+
+  const nestingLevelsByAttr = useMemo(() => {
+    const nesting = props.data?.predicateNesting;
+    if (!nesting || typeof nesting !== 'object') return {};
+    
+    const levels = nesting.levels || {};
+    return levels;
+  }, [props.data?.predicateNesting]);
 
   const predicateKeySignature = useMemo(() => {
     return Object.keys(predicates).sort().join('|');
@@ -1231,6 +1270,7 @@ function Node(props) {
               const circle = predicates[attr];
               const layouts = predicateLayoutsByAttr[attr] || [predicateLayout[attr]];
               const duplicateNumber = duplicateNumberByAttr[attr];
+              const nestingLevel = Number.parseInt(nestingLevelsByAttr[attr], 10) || 0;
               return layouts.map((layout, layoutIndex) => {
                 const predRadius = layout.radius;
                 const centerX = layout.centerX;
@@ -1259,6 +1299,18 @@ function Node(props) {
                 const handleSize = predRadius * 2;
                 const indicatorSize = Math.max(5, Math.round(predRadius * 0.35));
                 const showDuplicateBadge = typeof duplicateNumber === 'number';
+                
+                // Apply whitening effect based on nesting level
+                const lightenerCircle = nestingLevel > 0 && circle.color
+                  ? {
+                      ...circle,
+                      color: {
+                        ...circle.color,
+                        secondary: lightenHexColor(circle.color.secondary, nestingLevel)
+                      }
+                    }
+                  : circle;
+                
                 return (
                   <React.Fragment key={`${attr}-${layoutIndex}`}>
                     {/* Show label above bubble if hovered */}
@@ -1285,7 +1337,7 @@ function Node(props) {
                     <Predicate
                       index={index}
                       node={props.data.label}
-                      {...circle}
+                      {...lightenerCircle}
                       radius={predRadius}
                       position={{ x, y }}
                       style={{

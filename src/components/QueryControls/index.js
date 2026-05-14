@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Input, Switch, Select, Space, Typography, Divider, Row, Col, Modal } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined, RetweetOutlined, PlusOutlined, DeleteOutlined, DragOutlined, EyeInvisibleOutlined, EditOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { ArrowUpOutlined, ArrowDownOutlined, RetweetOutlined, PlusOutlined, DeleteOutlined, DragOutlined, EyeInvisibleOutlined, EditOutlined, SettingOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import './index.css';
 
 const { Text } = Typography;
@@ -26,6 +26,7 @@ const QueryControls = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [visible, setVisible] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
   const [legendVisible, setLegendVisible] = useState(false);
 
   // Array management for WITH and ORDER BY
@@ -134,11 +135,19 @@ const QueryControls = ({
         >
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <Button 
-                  type="primary" 
+                  type="primary"
                   shape="default" 
                   icon={<EditOutlined />} 
                   size="middle"
                   onClick={() => setVisible(true)}
+                  style={{ cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+              />
+              <Button
+                  type="default"
+                  shape="default"
+                  icon={<SettingOutlined />}
+                  size="middle"
+                  onClick={() => setSettingsVisible(true)}
                   style={{ cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
               />
               <Button
@@ -150,6 +159,56 @@ const QueryControls = ({
                   style={{ cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
               />
             </div>
+            <Modal
+              title="Settings"
+              visible={settingsVisible}
+              onCancel={() => setSettingsVisible(false)}
+              footer={null}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <Text strong>Show DNF Links</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Toggle AND/OR DNF edges in the graph.
+                    </Text>
+                  </div>
+                  <Switch
+                    checked={!!dnfLinksVisible}
+                    onChange={(checked) => onToggleDnfLinks && onToggleDnfLinks(checked)}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <Text strong>Enable DNF Grouping by AND</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Group AND predicates into halos.
+                    </Text>
+                  </div>
+                  <Switch
+                    checked={!!dnfAndGroupingEnabled}
+                    onChange={(checked) => onToggleDnfAndGrouping && onToggleDnfAndGrouping(checked)}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <Text strong>OR Representation</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Choose how OR predicate groups are drawn.
+                    </Text>
+                  </div>
+                  <Select
+                    value={orRepresentation || 'sunflower'}
+                    onChange={(value) => onChangeOrRepresentation && onChangeOrRepresentation(value)}
+                    size="small"
+                    style={{ width: 160 }}
+                  >
+                    <Option value="sunflower">Sunflower</Option>
+                    <Option value="concentric-circles">Concentric circles</Option>
+                  </Select>
+                </div>
+              </div>
+            </Modal>
             <Modal
               title="Graph Legend"
               visible={legendVisible}
@@ -208,48 +267,6 @@ const QueryControls = ({
                   </svg>
                   <Text>AND</Text>
                   <code style={{ background: '#f0f0f0', borderRadius: 4, fontSize: 12 }}>a.x AND b.y</code>
-                </div>
-                <Divider style={{ margin: '6px 0' }} />
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <Text strong>Show DNF Links</Text>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      Toggle AND/OR DNF edges in the graph.
-                    </Text>
-                  </div>
-                  <Switch
-                    checked={!!dnfLinksVisible}
-                    onChange={(checked) => onToggleDnfLinks && onToggleDnfLinks(checked)}
-                  />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <Text strong>Enable DNF Grouping by AND</Text>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      Group AND predicates into halos.
-                    </Text>
-                  </div>
-                  <Switch
-                    checked={!!dnfAndGroupingEnabled}
-                    onChange={(checked) => onToggleDnfAndGrouping && onToggleDnfAndGrouping(checked)}
-                  />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <Text strong>OR Representation</Text>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      Choose how OR predicate groups are drawn.
-                    </Text>
-                  </div>
-                  <Select
-                    value={orRepresentation || 'concentric-circles'}
-                    onChange={(value) => onChangeOrRepresentation && onChangeOrRepresentation(value)}
-                    size="small"
-                    style={{ width: 160 }}
-                  >
-                    <Option value="concentric-circles">Concentric circles</Option>
-                    <Option value="sunflower">Sunflower</Option>
-                  </Select>
                 </div>
               </div>
             </Modal>

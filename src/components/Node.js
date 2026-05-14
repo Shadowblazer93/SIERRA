@@ -37,6 +37,19 @@ const hexToRgba = (hex, alpha) => {
   return `rgba(0, 0, 0, ${alpha})`;
 };
 
+const darkenHsl = (hslStr, deltaLightness = 8) => {
+  try {
+    const m = /hsl\((\d+),\s*(\d+)%\,\s*(\d+)%\)/.exec(hslStr);
+    if (!m) return hslStr;
+    const h = Number(m[1]);
+    const s = Number(m[2]);
+    const l = Math.max(0, Number(m[3]) - deltaLightness);
+    return `hsl(${h}, ${s}%, ${l}%)`;
+  } catch (e) {
+    return hslStr;
+  }
+};
+
 const normalizeAngle = (angle) => {
   let value = angle;
   const twoPi = Math.PI * 2;
@@ -155,10 +168,19 @@ function Node(props) {
   const hasDNF = dnfRows.length > 0;
   const displayRadius = (hasDNF && !hasPredicates) ? props.data.radius + 15 : props.data.radius;
   const nodeOpacity = (state.dnfLinksVisible && state.dnfMode && !state.dnfHovering && props.data.dnfParticipates) ? 0.65 : 1;
-  const aggregationBubbles = useMemo(() => {
-    if (!hasAggregations) return [];
+  // Separate simple aggregations from pipeline aggregations
+  const simpleAggregations = useMemo(() => {
+    return aggregationEntries.filter(agg => !agg.hasCondition);
+  }, [aggregationEntries]);
 
-    const total = aggregationEntries.length;
+  const pipelineAggregations = useMemo(() => {
+    return aggregationEntries.filter(agg => agg.hasCondition);
+  }, [aggregationEntries]);
+
+  const aggregationBubbles = useMemo(() => {
+    if (simpleAggregations.length === 0) return [];
+
+    const total = simpleAggregations.length;
     const bubbleSize = total >= 10 ? 9 : (total >= 6 ? 10 : 11);
     const ringRadius = hasDNF ? Math.max(12, displayRadius - 38) : Math.max(14, displayRadius - 14);
     const startAngle = -Math.PI / 2;
@@ -170,7 +192,7 @@ function Node(props) {
       ? (requestedSpan > maxSpan ? maxSpan / (total - 1) : baseStep)
       : 0;
 
-    return aggregationEntries.map((agg, index) => {
+    return simpleAggregations.map((agg, index) => {
       const angle = startAngle + index * packedStep;
 
       const centerX = displayRadius + ringRadius * Math.cos(angle);
@@ -188,7 +210,41 @@ function Node(props) {
         color
       };
     });
-  }, [aggregationEntries, displayRadius, hasAggregations, hasDNF, props.id]);
+  }, [simpleAggregations, displayRadius, hasDNF, props.id]);
+
+  // Pipeline aggregations positioned like predicate bubbles
+  const pipelineAggregationBubbles = useMemo(() => {
+    if (pipelineAggregations.length === 0) return [];
+
+    const predicateCount = Object.keys(predicates).length;
+    const totalCount = predicateCount + pipelineAggregations.length;
+
+    if (totalCount === 0) return [];
+
+    const bubbleRadius = 8;
+    const angleOffset = -Math.PI / 8;
+
+    return pipelineAggregations.map((agg, aggIndex) => {
+      const index = predicateCount + aggIndex;
+      const angle = angleOffset + (index / totalCount) * 2 * Math.PI;
+      const centerX = displayRadius + displayRadius * Math.cos(angle);
+      const centerY = displayRadius + displayRadius * Math.sin(angle);
+
+      const seed = `${props.id}|${aggIndex}|${agg.function || ''}|${agg.attribute || ''}|${agg.alias || ''}|${agg.operator || ''}|${agg.value || ''}`;
+      const color = buildRandomAggregationColor(seed);
+
+      return {
+        key: `pipeline-agg-bubble-${props.id}-${aggIndex}`,
+        agg,
+        index: aggIndex,
+        centerX,
+        centerY,
+        radius: bubbleRadius,
+        angle,
+        color
+      };
+    });
+  }, [pipelineAggregations, predicates, displayRadius, props.id]);
 
   const orGroupRoots = useMemo(() => {
     if (props.data?.orGroupRoots && typeof props.data.orGroupRoots === 'object') {
@@ -612,6 +668,77 @@ function Node(props) {
           </Tooltip>
         ))}
 
+        {/* Pipeline Aggregation Bubbles - displayed as predicate-style bubbles */}
+        {pipelineAggregationBubbles.map((bubble) => {
+          const bubbleX = bubble.centerX - bubble.radius;
+          const bubbleY = bubble.centerY - bubble.radius;
+          const bubbleSize = bubble.radius * 2;
+
+          return (
+            <Tooltip
+              key={bubble.key}
+              title={
+                <div style={{ maxWidth: 280 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                    Pipeline Aggregation
+                  </div>
+                  <div style={{ fontSize: 12, lineHeight: 1.4 }}>
+                    {formatAggregationLine(bubble.agg)}
+                  </div>
+                </div>
+              }
+              placement="top"
+              overlayStyle={{ zIndex: 9999, maxWidth: 300 }}
+              mouseEnterDelay={0}
+              mouseLeaveDelay={0.05}
+              destroyTooltipOnHide
+              getPopupContainer={() => document.body}
+            >
+              <div
+                onMouseDown={(event) => event.stopPropagation()}
+                onMouseUp={(event) => event.stopPropagation()}
+                onClick={(event) => event.stopPropagation()}
+                style={{
+                  position: 'absolute',
+                  left: bubbleX,
+                  top: bubbleY,
+                  width: bubbleSize,
+                  height: bubbleSize,
+                  borderRadius: '50%',
+                  border: '1px solid rgba(0,0,0,0.3)',
+                  background: bubble.color.bg,
+                  color: bubble.color.text,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                  cursor: 'pointer',
+                  zIndex: 25,
+                  pointerEvents: 'all',
+                  lineHeight: 1
+                }}
+                >
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: '50%',
+                    top: '50%',
+                    width: Math.round(bubbleSize * 0.65) + 'px',
+                    height: Math.round(bubbleSize * 0.65) + 'px',
+                    borderRadius: '50%',
+                    background: darkenHsl(bubble.color.bg, 10),
+                    boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.04)',
+                    transform: 'translate(-50%, -50%)',
+                    pointerEvents: 'none'
+                  }}
+                />
+              </div>
+            </Tooltip>
+          );
+        })}
+
         {props.data.isJoin && (
           <Tooltip
             title={
@@ -660,14 +787,17 @@ function Node(props) {
       {state.predDisplayStatus === "FULL" && (() => {
         const predicateKeys = Object.keys(predicates);
         const predicateCount = predicateKeys.length;
-        if (predicateCount === 0) return null;
+        const pipelineAggCount = pipelineAggregations.length;
+        const totalBubbleCount = predicateCount + pipelineAggCount;
+        
+        if (totalBubbleCount === 0) return null;
 
         const maxRadius = Math.max(...predicateKeys.map((attr) => predicates[attr]?.radius ?? 8));
 
         const anchorByAttr = {};
         const angleOffset = -Math.PI / 8;
         predicateKeys.forEach((attr, index) => {
-          const angle = angleOffset + (index / predicateCount) * 2 * Math.PI;
+          const angle = angleOffset + (index / totalBubbleCount) * 2 * Math.PI;
           const centerX = displayRadius + displayRadius * Math.cos(angle);
           const centerY = displayRadius + displayRadius * Math.sin(angle);
           anchorByAttr[attr] = { centerX, centerY, index, angle };
@@ -684,7 +814,7 @@ function Node(props) {
           predicateLayoutsByAttr[attr] = [baseLayout];
         });
 
-        const orRepresentation = state.orRepresentation || 'concentric-circles';
+        const orRepresentation = state.orRepresentation || 'sunflower';
         const orGroupVisualMeta = {};
         const groupLayoutsById = {};
 

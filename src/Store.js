@@ -8,7 +8,7 @@ const initialState = {
   neighbours: {},
   props: {},
   predDisplayStatus: 'FULL',
-  orRepresentation: 'concentric-circles',
+  orRepresentation: 'sunflower',
   modalVisible: '',
   linkingPredicate: null,
   predicateLinks: [],

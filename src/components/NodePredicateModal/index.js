@@ -1326,9 +1326,12 @@ const NodePredicateModal = ({
         visible={visible}
         push={false}
       >
-        <Divider orientation="left">Selected Predicates</Divider>
+        <div onMouseDown={(e) => e.stopPropagation()}>
+          <Divider orientation="left">Selected Predicates</Divider>
 
-        <div style={{padding: '0px 15px 10px'}}>
+          <div 
+            style={{padding: '0px 15px 10px'}}
+          >
           <Button
             style={{ marginBottom: 10 }}
             block
@@ -1638,6 +1641,7 @@ const NodePredicateModal = ({
             })
           }
         </div>
+        </div>
 
         <Drawer
           title={<Title style={{marginBottom: 0}} level={3}>Change Nesting</Title>}
@@ -1654,7 +1658,8 @@ const NodePredicateModal = ({
           push={false}
           width={580}
         >
-          <div style={{ padding: '0 4px 12px' }}>
+          <div onMouseDown={(e) => e.stopPropagation()}>
+            <div style={{ padding: '0 4px 12px' }}>
             <div
               style={{
                 display: 'grid',
@@ -1689,18 +1694,20 @@ const NodePredicateModal = ({
               return (
                 <React.Fragment key={`nest-${attr}`}>
                   <div style={{ display: 'flex', justifyContent: 'center', margin: '2px 0 6px' }}>
-                    <Button
-                      size="small"
-                      type={mode === 'OR' ? 'primary' : 'default'}
-                      style={mode === 'OR' ? { backgroundColor: '#fa8c16', borderColor: '#fa8c16', fontWeight: 600 } : { fontWeight: 600 }}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        togglePredicateMode(attr);
-                      }}
-                    >
-                      {mode}
-                    </Button>
+                    <Tooltip title={index === 0 ? "First node's operation has no effect on the graph" : ''}>
+                      <Button
+                        size="small"
+                        type={mode === 'OR' ? 'primary' : 'default'}
+                        style={mode === 'OR' ? { backgroundColor: '#fa8c16', borderColor: '#fa8c16', fontWeight: 600, opacity: index === 0 ? 0.5 : 1 } : { fontWeight: 600, opacity: index === 0 ? 0.5 : 1 }}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          togglePredicateMode(attr);
+                        }}
+                      >
+                        {mode}
+                      </Button>
+                    </Tooltip>
                   </div>
 
                   <div
@@ -1958,6 +1965,7 @@ const NodePredicateModal = ({
                 style={{ maxWidth: '100%' }}
               />
             </div>
+          </div>
           </div>
         </Drawer>
 

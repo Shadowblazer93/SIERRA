@@ -13,19 +13,19 @@
     ],
     "background_color": "#4e0041",
     "theme_color": "#4e0041",
-    "main.css": ".assets/css/main.e922e500a82f3f084c3c.css",
-    "main.js": ".assets/js/main.5e2789c6.bundle.js",
+    "main.css": ".assets/css/main.805fb07b5109a3780c18.css",
+    "main.js": ".assets/js/main.786d58a2.bundle.js",
     "main.png": ".assets/images/join_icon.bca57eba9c33f5b3e9ebf44ee31cbde8.png",
-    "assets/css/889.e922e500a82f3f084c3c.css": ".assets/css/889.e922e500a82f3f084c3c.css",
+    "assets/css/889.805fb07b5109a3780c18.css": ".assets/css/889.805fb07b5109a3780c18.css",
     "assets/js/889.bdb0471a.bundle.js": ".assets/js/889.bdb0471a.bundle.js",
     "public/favicon.ico": ".favicon.ico",
     "assets/images/join_icon.png": ".assets/images/join_icon.bca57eba9c33f5b3e9ebf44ee31cbde8.png",
     "index.html": ".index.html"
   },
   "entrypoints": [
-    "assets/css/889.e922e500a82f3f084c3c.css",
+    "assets/css/889.805fb07b5109a3780c18.css",
     "assets/js/889.bdb0471a.bundle.js",
-    "assets/css/main.e922e500a82f3f084c3c.css",
-    "assets/js/main.5e2789c6.bundle.js"
+    "assets/css/main.805fb07b5109a3780c18.css",
+    "assets/js/main.786d58a2.bundle.js"
   ]
 }

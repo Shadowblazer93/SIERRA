@@ -3,7 +3,7 @@ import './index.css';
 import { Drawer, Button, Collapse, Typography } from 'antd';
 import { useContext } from 'react';
 import { Context } from '../../Store'
-import { CaretRightOutlined, PlusOutlined } from '@ant-design/icons';
+import { CaretRightOutlined, PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { USER_STUDY_ENTITIES } from '../../constants';
 const {Panel} = Collapse;
 const {Title, Text} = Typography;
@@ -34,7 +34,7 @@ const NewNodeDrawButton = ({addNode}) => {
       </Button>
       <Drawer
         zIndex={10000}
-        closeIcon={null}
+        closeIcon={<ArrowLeftOutlined/>}
         title={<Title style={{marginBottom: 0}}level={3} >Add A New Node</Title>}
         placement="left"
         onClose={onClose}

@@ -627,17 +627,17 @@ const JoinGraphView = ({ onEditLink }) => {
         style={{
           position: 'fixed',
           top: 29,
-          right: 310,
+          right: 279,
           zIndex: 1000,
           fontSize: 13,
           height: 32,
           borderRadius: 4,
           marginBottom: 0
         }}
-        type="primary"
+        type={showJoinView ? 'primary' : 'default'}
         onClick={() => setShowJoinView(v => !v)}
       >
-        {showJoinView ? "Hide Join View" : "Show Join View"}
+        Join View
       </Button>
 
       {showJoinView && (

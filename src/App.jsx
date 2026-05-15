@@ -872,7 +872,7 @@ function App() {
       <>
           <div>
             <div className="main-buttons">
-              {state.modalVisible !== '' && (<div style={{width: 363}}/>)}
+              {state.modalVisible !== '' && (<div />)}
               <Title
                 style={{margin: 0, marginRight: 14}}
                 level={3}>
@@ -912,7 +912,7 @@ function App() {
                   size="middle"
                   className="link-tool-select"
                   dropdownClassName="link-tool-dropdown"
-                  style={{ width: 150 }}
+                  style={{ width: 120 }}
                 >
                   <Select.Option value="join" className="link-tool-option link-tool-join">
                     Join

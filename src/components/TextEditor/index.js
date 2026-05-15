@@ -249,10 +249,10 @@ export default function({text}){
           borderRadius: 4,
           marginBottom: 0
         }}
-        type="primary"
+        type={showQuery ? 'primary' : 'default'}
         onClick={() => setShowQuery(v => !v)}
       >
-        {showQuery ? "Hide Cypher Query" : "Show Cypher Query"}
+        Cypher Query
       </Button>
       {showQuery && (
         <div 

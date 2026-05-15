@@ -4,10 +4,11 @@
   z-index: 20;
   display: flex;
   flex-direction: row;
-  width: 100%;
-  align-items: center;
   top: 0;
   left: 0;
+  right: 0;
+  align-items: center;
+  box-sizing: border-box;
 }
 
 .toolbar-ribbon {

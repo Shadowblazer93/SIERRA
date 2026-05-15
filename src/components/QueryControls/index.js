@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Button, Input, Switch, Select, Space, Typography, Divider, Row, Col, Modal } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined, RetweetOutlined, PlusOutlined, DeleteOutlined, DragOutlined, EyeInvisibleOutlined, EditOutlined, SettingOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { ArrowUpOutlined, ArrowDownOutlined, RetweetOutlined, PlusOutlined, DeleteOutlined, DragOutlined, EyeInvisibleOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import './index.css';
 
 const { Text } = Typography;
 const { Option } = Select;
 
-const QueryControls = ({
+const QueryControls = forwardRef(({
   options,
   onOptionsChange,
   orRepresentation,
@@ -14,12 +14,14 @@ const QueryControls = ({
   dnfLinksVisible,
   onToggleDnfLinks,
   dnfAndGroupingEnabled,
-  onToggleDnfAndGrouping
-}) => {
+  onToggleDnfAndGrouping,
+  onVisibleChange
+}, ref) => {
   const [limit, setLimit] = useState(options.limit || '');
   const [skip, setSkip] = useState(options.skip || '');
   const [distinct, setDistinct] = useState(options.distinct || false);
   const [returnClause, setReturnClause] = useState(options.returnClause || '');
+  const containerRef = useRef(null);
   
   // Dragging State
   const [position, setPosition] = useState({ x: 45, y: window.innerHeight - 340 });
@@ -28,6 +30,18 @@ const QueryControls = ({
   const [visible, setVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [legendVisible, setLegendVisible] = useState(false);
+
+  useImperativeHandle(ref, () => ({
+    toggleQueryControls: () => setVisible((prev) => !prev),
+    openQueryControls: () => setVisible(true),
+    openSettings: () => setSettingsVisible(true)
+  }), []);
+
+  useEffect(() => {
+    if (onVisibleChange) {
+      onVisibleChange(visible);
+    }
+  }, [visible, onVisibleChange]);
 
   // Array management for WITH and ORDER BY
   const [withClauses, setWithClauses] = useState(options.withClauses || []);
@@ -50,12 +64,24 @@ const QueryControls = ({
 
   // Drag Effects
   useEffect(() => {
+    const clampPosition = (nextPosition) => {
+      const containerWidth = containerRef.current?.offsetWidth || 275;
+      const containerHeight = containerRef.current?.offsetHeight || 0;
+      const maxX = Math.max(0, window.innerWidth - containerWidth);
+      const maxY = Math.max(0, window.innerHeight - containerHeight);
+
+      return {
+        x: Math.min(Math.max(nextPosition.x, 0), maxX),
+        y: Math.min(Math.max(nextPosition.y, 0), maxY)
+      };
+    };
+
     const handleMouseMove = (e) => {
       if (!isDragging) return;
-      setPosition({
+      setPosition(clampPosition({
         x: e.clientX - dragOffset.x,
         y: e.clientY - dragOffset.y
-      });
+      }));
     };
 
     const handleMouseUp = () => {
@@ -72,6 +98,20 @@ const QueryControls = ({
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isDragging, dragOffset]);
+
+  useLayoutEffect(() => {
+    if (!visible || !containerRef.current) return;
+
+    const containerWidth = containerRef.current.offsetWidth || 275;
+    const containerHeight = containerRef.current.offsetHeight || 0;
+    const maxX = Math.max(0, window.innerWidth - containerWidth);
+    const maxY = Math.max(0, window.innerHeight - containerHeight);
+
+    setPosition((current) => ({
+      x: Math.min(current.x, maxX),
+      y: Math.min(current.y, maxY)
+    }));
+  }, [visible, limit, skip, distinct, returnClause, withClauses, orderBys]);
 
   const handleMouseDown = (e) => {
     // Only drag if clicking the header area (we'll implement this in render)
@@ -92,6 +132,29 @@ const QueryControls = ({
         returnClause
     });
   };
+
+  // Track whether local controls differ from incoming `options` (unsaved changes)
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    const normalize = (opts) => ({
+      limit: (opts && opts.limit) != null ? String(opts.limit) : '',
+      skip: (opts && opts.skip) != null ? String(opts.skip) : '',
+      distinct: !!(opts && opts.distinct),
+      returnClause: (opts && opts.returnClause) || '',
+      withClauses: (opts && opts.withClauses || []).map(w => ({ expression: w.expression || '', alias: w.alias || '' })),
+      orderBys: (opts && opts.orderBys || []).map(o => ({ field: o.field || '', direction: o.direction || 'ASC' }))
+    });
+
+    const local = normalize({ limit, skip, distinct, returnClause, withClauses, orderBys });
+    const incoming = normalize(options || {});
+
+    try {
+      setDirty(JSON.stringify(local) !== JSON.stringify(incoming));
+    } catch (e) {
+      setDirty(true);
+    }
+  }, [limit, skip, distinct, returnClause, withClauses, orderBys, options]);
 
   // WITH Handlers
   const addWithClause = () => {
@@ -134,22 +197,6 @@ const QueryControls = ({
             }}
         >
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <Button 
-                  type="primary"
-                  shape="default" 
-                  icon={<EditOutlined />} 
-                  size="middle"
-                  onClick={() => setVisible(true)}
-                  style={{ cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
-              />
-              <Button
-                  type="default"
-                  shape="default"
-                  icon={<SettingOutlined />}
-                  size="middle"
-                  onClick={() => setSettingsVisible(true)}
-                  style={{ cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
-              />
               <Button
                   type="default"
                   shape="default"
@@ -277,6 +324,7 @@ const QueryControls = ({
   return (
     <div 
         className="query-controls-container"
+      ref={containerRef}
         style={{ 
             left: position.x, 
             top: position.y,
@@ -402,56 +450,65 @@ const QueryControls = ({
 
         <Divider style={{ margin: '4px 0' }} />
 
-        <Row gutter={8} align="middle" justify="space-between">
+        <div style={{ display: 'flex', flexDirection: 'column-reverse' }}>
+          <Row gutter={8} align="middle" justify="space-between" style={{ marginTop: 4 }}>
              <Col><Text strong>ORDER BY</Text></Col>
              <Col>
-                <Button size="small" type="dashed" onClick={addOrderBy} icon={<PlusOutlined />} />
+              <Button size="small" type="dashed" onClick={addOrderBy} icon={<PlusOutlined />} />
              </Col>
-        </Row>
-        
-        {orderBys.map((order, idx) => (
-            <Row key={order.id || idx} gutter={4} style={{ marginBottom: 4 }} align="middle">
-                <Col span={14}>
-                    <Input 
-                        placeholder="Property" 
-                        value={order.field}
-                        onChange={e => updateOrderBy(idx, 'field', e.target.value)}
-                        size="small"
-                    />
-                </Col>
-                <Col span={8}>
-                     <Space>
-                        <Button 
-                            size="small" 
-                            type={order.direction === 'ASC' ? 'primary' : 'default'}
-                            onClick={() => updateOrderBy(idx, 'direction', 'ASC')}
-                            icon={<ArrowUpOutlined />}
-                        />
-                        <Button 
-                            size="small" 
-                            type={order.direction === 'DESC' ? 'primary' : 'default'}
-                            onClick={() => updateOrderBy(idx, 'direction', 'DESC')}
-                            icon={<ArrowDownOutlined />}
-                        />
-                     </Space>
-                </Col>
-                <Col span={2}>
-                    <Button 
-                        size="small" 
-                        danger 
-                        icon={<DeleteOutlined />} 
-                        onClick={() => removeOrderBy(idx)} 
-                    />
-                </Col>
-            </Row>
-        ))}
+          </Row>
 
-        <Button type="primary" block onClick={applyControls} icon={<RetweetOutlined />} style={{marginTop: 8}}>
-            Update Query
+          {orderBys.map((order, idx) => (
+            <Row key={order.id || idx} gutter={4} style={{ marginBottom: 4 }} align="middle">
+              <Col span={14}>
+                <Input 
+                  placeholder="Property" 
+                  value={order.field}
+                  onChange={e => updateOrderBy(idx, 'field', e.target.value)}
+                  size="small"
+                />
+              </Col>
+              <Col span={8}>
+                 <Space>
+                  <Button 
+                    size="small" 
+                    type={order.direction === 'ASC' ? 'primary' : 'default'}
+                    onClick={() => updateOrderBy(idx, 'direction', 'ASC')}
+                    icon={<ArrowUpOutlined />}
+                  />
+                  <Button 
+                    size="small" 
+                    type={order.direction === 'DESC' ? 'primary' : 'default'}
+                    onClick={() => updateOrderBy(idx, 'direction', 'DESC')}
+                    icon={<ArrowDownOutlined />}
+                  />
+                 </Space>
+              </Col>
+              <Col span={2}>
+                <Button 
+                  size="small" 
+                  danger 
+                  icon={<DeleteOutlined />} 
+                  onClick={() => removeOrderBy(idx)} 
+                />
+              </Col>
+            </Row>
+          ))}
+        </div>
+
+        <Button
+          type="primary"
+          block
+          onClick={applyControls}
+          icon={<RetweetOutlined />}
+          style={{ marginTop: 8 }}
+          disabled={!dirty}
+        >
+          Update Query
         </Button>
       </Space>
     </div>
   );
-};
+});
 
 export default QueryControls;

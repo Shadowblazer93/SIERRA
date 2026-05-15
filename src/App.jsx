@@ -14,19 +14,43 @@ import OrLinkEdge from './components/OrLinkEdge';
 import AndLinkEdge from './components/AndLinkEdge';
 import PredicateLinkModal from './components/PredicateLinkModal';
 import ConfirmationAlert from './components/ConfirmationAlert';
-import {Button, Spin, Select, Drawer, Modal, Form, Input, Row, Col} from 'antd';
-import {InfoCircleOutlined, CopyOutlined, LoadingOutlined, ApiOutlined, ArrowLeftOutlined} from '@ant-design/icons'
+import {Button, Spin, Select, Drawer, Modal, Form, Input, Row, Col, message} from 'antd';
+import {InfoCircleOutlined, CopyOutlined, LoadingOutlined, ApiOutlined, ArrowLeftOutlined, NodeIndexOutlined, EyeOutlined, EditOutlined, SettingOutlined, SnippetsOutlined} from '@ant-design/icons'
 import Title from 'antd/lib/typography/Title';
 import { getNodeId } from './utils/getNodeId';
 import useVisualActions from './hooks/useVisualActions'
 import JoinGraphView from './components/JoinGraphView';
 import QueryControls from './components/QueryControls';
+import QueryClipboardSidebar from './components/QueryClipboardSidebar';
+import { convertToGraph } from './utils/converToGraph';
 import { buildDnfAndLinksFromQuery } from './utils/dnfGraph';
 import { buildOrGroupRoots } from './utils/orGroupRoots';
+import { resetCurAvailId, undoResetNodeId } from './utils/getNodeId';
+import { PRED_COLOR_V2 } from './constants';
 const neo4jApi = require('./neo4jApi')
 const pkg = require('../package.json')
 
 const api = require('./neo4jApi');
+const QUERY_CLIPBOARD_STORAGE_KEY = 'sierra-query-clipboard';
+
+const createPastelColor = () => {
+  const hue = Math.floor(Math.random() * 360);
+  return `hsl(${hue}, 70%, 88%)`;
+};
+
+const loadQueryClipboard = () => {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(QUERY_CLIPBOARD_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+};
 
 function App() {
   const VA = useVisualActions()
@@ -42,6 +66,7 @@ function App() {
   const [linkToolMode, setLinkToolMode] = useState('join');
   const connectModeRef = useRef('join');
   const pendingOrRef = useRef(false);
+  const queryControlsRef = useRef(null);
   const orGroupColorsRef = useRef({});
   const [hoveredOrGroupId, setHoveredOrGroupId] = useState(null);
   const orGroupHoverTimeout = useRef(null);
@@ -51,6 +76,10 @@ function App() {
   const dnfHoverResetTimer = useRef(null);
   const lastDnfModeRef = useRef(false);
   const dnfActivationTimer = useRef(null);
+  const [queryClipboardVisible, setQueryClipboardVisible] = useState(false);
+  const [queryClipboardHistory, setQueryClipboardHistory] = useState(() => loadQueryClipboard());
+  const suppressQuerySyncRef = useRef(false);
+  const [queryControlsVisible, setQueryControlsVisible] = useState(false);
   
   const [queryOptions, setQueryOptions] = useState({
     limit: '',
@@ -60,6 +89,14 @@ function App() {
     withClauses: [], // Changed from withClause string to array of objects { expression, alias }
     returnClause: ''
   });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(QUERY_CLIPBOARD_STORAGE_KEY, JSON.stringify(queryClipboardHistory));
+    } catch (error) {
+      // Ignore storage failures so query execution stays usable.
+    }
+  }, [queryClipboardHistory]);
 
   const [connectModalVisible, setConnectModalVisible] = useState(false);
   const [form] = Form.useForm();
@@ -142,12 +179,194 @@ function App() {
   // const [userStudyDataset, setUserStudyDataset] = useState('Northwind')
 
   const handleSearch = async () => {
-    const res = await VA.run(cypherQuery)
-    setSearchResult(res);
-    setShowResults(true);
+    try {
+      const res = await VA.run(cypherQuery);
+      setSearchResult(res);
+      setShowResults(true);
+      setQueryClipboardHistory((prev) => [
+        ...prev,
+        {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          query: cypherQuery,
+          executedAt: new Date().toISOString(),
+          backgroundColor: createPastelColor(),
+          starred: false
+        }
+      ]);
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const restoreQueryGraph = (query) => {
+    const restoreQueryText = (query || '').trim();
+    setCypherQuery(restoreQueryText);
+
+    const graphQuery = restoreQueryText
+      .split('\n')
+      .reduce((lines, line) => {
+        if (/^(WITH|ORDER BY|SKIP|LIMIT)\b/i.test(line.trim())) {
+          return lines;
+        }
+        lines.push(line);
+        return lines;
+      }, [])
+      .join('\n')
+      .trim();
+
+    if (!graphQuery) {
+      message.warning('Copied query into the editor, but no graph section was found to restore.');
+      return;
+    }
+
+    try {
+      resetCurAvailId();
+      const { nodes: midNodes, edges: midEdges } = convertToGraph(graphQuery, state);
+      let newGraph = {
+        ...state,
+        nodes: [],
+        edges: []
+      };
+
+      const nodePositionMap = {};
+      for (const oldNode of state.nodes || []) {
+        nodePositionMap[oldNode.id] = oldNode.position || oldNode.__rf?.position;
+      }
+
+      for (const [key, nodeRecord] of Object.entries(midNodes)) {
+        const oldCopy = (state.nodes || []).find((element) => element.id === nodeRecord.nodeId);
+        let oldPosition = { x: 500, y: 200 };
+        let oldRanTheta;
+
+        if (oldCopy && nodeRecord.label === oldCopy.data?.label) {
+          oldPosition = oldCopy.position || oldCopy.__rf?.position || oldPosition;
+          oldRanTheta = oldCopy.ranTheta;
+        } else {
+          const positions = Object.values(nodePositionMap).filter(Boolean);
+          let startHeight = 200;
+          while (positions.filter((pos) => (startHeight - 100 < pos.y) && (startHeight + 100 > pos.y)).length > 0) {
+            startHeight += 120;
+          }
+          oldPosition = { y: startHeight, x: 500 };
+          nodePositionMap[nodeRecord.nodeId] = oldPosition;
+        }
+
+        newGraph = VA.add(newGraph, 'NODE', {
+          id: nodeRecord.nodeId,
+          label: nodeRecord.label,
+          position: oldPosition,
+          ranTheta: oldRanTheta,
+          data: {
+            connected: nodeRecord.connected,
+            rep: key
+          }
+        });
+
+        if (nodeRecord.predicates) {
+          for (const attrName in nodeRecord.predicates) {
+            const predicates = nodeRecord.predicates[attrName];
+            const propsList = state.props[nodeRecord.label] || [];
+            const index = propsList.indexOf(attrName);
+            const color = PRED_COLOR_V2[index % PRED_COLOR_V2.length];
+
+            for (const [literal, value] of predicates) {
+              newGraph = VA.add(newGraph, 'PREDICATE', {
+                attr: attrName,
+                vals: [literal, value],
+                parent: nodeRecord.nodeId,
+                color
+              });
+            }
+          }
+        }
+      }
+
+      for (const [key, edgeRecord] of Object.entries(midEdges)) {
+        newGraph = VA.add(newGraph, 'EDGE', {
+          params: {
+            source: edgeRecord.source,
+            target: edgeRecord.target
+          },
+          addData: {
+            rs: edgeRecord.rs,
+            rep: edgeRecord.rep
+          }
+        });
+
+        const targetNode = newGraph.nodes.find((element) => element.id === edgeRecord.target);
+        const sourceNode = newGraph.nodes.find((element) => element.id === edgeRecord.source);
+
+        if (!state.nodes.find((element) => element.id === edgeRecord.target)) {
+          const sourcePosition = nodePositionMap[edgeRecord.source] || sourceNode?.position || { x: 500, y: 200 };
+          const newPos = { y: sourcePosition.y, x: sourcePosition.x + 200 };
+          if (targetNode) {
+            targetNode.position = newPos;
+          }
+          nodePositionMap[edgeRecord.target] = newPos;
+        }
+
+        const edgeId = `e${edgeRecord.source}-${edgeRecord.target}`;
+        if (edgeRecord.arrowHeadType) {
+          newGraph = VA.update(newGraph, 'EDGE', {
+            edge: edgeId,
+            prop: 'arrowHeadType',
+            newVal: edgeRecord.arrowHeadType
+          });
+        }
+
+        if (edgeRecord.predicates) {
+          for (const attrName in edgeRecord.predicates) {
+            const predicates = edgeRecord.predicates[attrName];
+
+            const edge = newGraph.edges.find((element) => element.id === edgeId);
+            const relationships = edge?.data?.relationships || [];
+            const allRelationships = {};
+            relationships.map((relationship) => {
+              allRelationships[relationship.type] = relationship.props;
+            });
+            const rsAttributes = edgeRecord.rs ? (allRelationships[edgeRecord.rs] || []) : [];
+            const index = rsAttributes ? rsAttributes.indexOf(attrName) : -1;
+            const color = PRED_COLOR_V2[(index >= 0 ? index : 0) % PRED_COLOR_V2.length];
+
+            for (const [literal, value] of predicates) {
+              newGraph = VA.add(newGraph, 'PREDICATE', {
+                attr: attrName,
+                vals: [literal, value],
+                parent: edgeId,
+                color,
+                sourcePos: {
+                  x: (sourceNode?.position?.x || 500) + (((sourceNode?.radius || 50) * 2) + 4),
+                  y: (sourceNode?.position?.y || 200) + (sourceNode?.radius || 50)
+                },
+                targetPos: {
+                  x: (targetNode?.position?.x || 500) - 4,
+                  y: (targetNode?.position?.y || 200) + (targetNode?.radius || 50)
+                }
+              });
+            }
+          }
+        }
+      }
+
+      suppressQuerySyncRef.current = true;
+      dispatch({
+        type: 'SET_GRAPH',
+        payload: newGraph
+      });
+      setCypherQuery(restoreQueryText);
+      message.success('Restored query into the editor and graph.');
+    } catch (error) {
+      undoResetNodeId();
+      message.error(`Could not restore that query graph: ${error}`);
+    }
   };
 
   useEffect(() => {
+    if (suppressQuerySyncRef.current) {
+      suppressQuerySyncRef.current = false;
+      return;
+    }
+
     if(state.nodes && state.nodes.length > 0){
       let query = api.convertToQuery(state)
       
@@ -685,26 +904,50 @@ function App() {
                 </Select>
               </div>
               <NewNodeDrawButton addNode={addNode} />
-              <Select
-                value={linkToolMode}
-                onChange={setLinkToolMode}
-                size="middle"
-                className="link-tool-select"
-                dropdownClassName="link-tool-dropdown"
-                style={{ width: 150, marginLeft: 50 }}
-              >
-                <Select.Option value="join" className="link-tool-option link-tool-join">
-                  Join
-                </Select.Option>
-                <Select.Option value="or" className="link-tool-option link-tool-or">
-                  OR Link
-                </Select.Option>
-                <Select.Option value="and" className="link-tool-option link-tool-and">
-                  AND Link
-                </Select.Option>
-              </Select>
-              <PredicateDisplayDropDown value={state.predDisplayStatus} onSelect={_internalDispatchPredDisplayStatus} />
-              {/* <UserStudyDatasetDropDown value={userStudyDataset} onSelect={setUserStudyDataset} /> */}
+              <div className="toolbar-ribbon" style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 28 }}>
+                <NodeIndexOutlined style={{ fontSize: 16, color: '#5f6b7a', marginRight: -6 }} />
+                <Select
+                  value={linkToolMode}
+                  onChange={setLinkToolMode}
+                  size="middle"
+                  className="link-tool-select"
+                  dropdownClassName="link-tool-dropdown"
+                  style={{ width: 150 }}
+                >
+                  <Select.Option value="join" className="link-tool-option link-tool-join">
+                    Join
+                  </Select.Option>
+                  <Select.Option value="or" className="link-tool-option link-tool-or">
+                    OR Link
+                  </Select.Option>
+                  <Select.Option value="and" className="link-tool-option link-tool-and">
+                    AND Link
+                  </Select.Option>
+                </Select>
+                <EyeOutlined style={{ fontSize: 16, color: '#5f6b7a', marginLeft: -2, marginRight: -12 }} />
+                <PredicateDisplayDropDown value={state.predDisplayStatus} onSelect={_internalDispatchPredDisplayStatus} />
+                <Button
+                  type={queryControlsVisible ? 'primary' : 'default'}
+                  shape="default"
+                  icon={<EditOutlined />}
+                  size="middle"
+                  onClick={() => queryControlsRef.current?.toggleQueryControls()}
+                />
+                <Button
+                  type={queryClipboardVisible ? 'primary' : 'default'}
+                  shape="default"
+                  icon={<SnippetsOutlined />}
+                  size="middle"
+                  onClick={() => setQueryClipboardVisible((visible) => !visible)}
+                />
+                <Button
+                  type="default"
+                  shape="default"
+                  icon={<SettingOutlined />}
+                  size="middle"
+                  onClick={() => queryControlsRef.current?.openSettings()}
+                />
+              </div>
               <Button
                 style={{
                   width: 120,
@@ -767,8 +1010,10 @@ function App() {
 
           <JoinGraphView onEditLink={handleEditLink} />
           <QueryControls 
+            ref={queryControlsRef}
             options={queryOptions} 
             onOptionsChange={setQueryOptions}
+            onVisibleChange={setQueryControlsVisible}
             orRepresentation={state.orRepresentation}
             onChangeOrRepresentation={(value) => dispatch({ type: 'SET_OR_REPRESENTATION', payload: value })}
             dnfLinksVisible={state.dnfLinksVisible}
@@ -782,6 +1027,18 @@ function App() {
             onToggleDnfAndGrouping={(enabled) => {
               dispatch({ type: 'SET_DNF_AND_GROUPING', payload: enabled });
             }}
+          />
+          <QueryClipboardSidebar
+            visible={queryClipboardVisible}
+            onClose={() => setQueryClipboardVisible(false)}
+            history={queryClipboardHistory}
+            onToggleStar={(id) => {
+              setQueryClipboardHistory((prev) => prev.map((item) => (
+                item.id === id ? { ...item, starred: !item.starred } : item
+              )));
+            }}
+            onRestore={restoreQueryGraph}
+            onClearHistory={() => setQueryClipboardHistory([])}
           />
           <ReactFlowProvider>
             <CypherTextEditor text={cypherQuery}/>

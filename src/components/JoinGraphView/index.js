@@ -626,7 +626,7 @@ const JoinGraphView = ({ onEditLink }) => {
       <Button
         style={{
           position: 'fixed',
-          top: 24,
+          top: 29,
           right: 310,
           zIndex: 1000,
           fontSize: 13,

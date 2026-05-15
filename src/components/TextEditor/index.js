@@ -241,7 +241,7 @@ export default function({text}){
       <Button
         style={{
           position: 'fixed',
-          top: 24,
+          top: 29,
           right: 160,
           zIndex: 1000,
           fontSize: 13,

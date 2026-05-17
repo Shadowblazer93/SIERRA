@@ -139,3 +139,5 @@ export const PRED_COLOR_V2 = [
     secondary: '#d3adf7'
   },
 ]
+
+export const ENABLE_DNF_BUILDER = false;

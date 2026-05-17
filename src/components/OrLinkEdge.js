@@ -142,7 +142,7 @@ function OrLinkEdge({ id, sourceX, sourceY, targetX, targetY, data }) {
       </defs>
       <path
         d={edgePath}
-        style={{ stroke: 'transparent', strokeWidth: 10, cursor: 'default' }}
+        style={{ stroke: 'transparent', strokeWidth: 10, cursor: 'default', fill: 'none' }}
         onMouseEnter={() => {
           beginHover();
           scheduleDnfHoverStart();
@@ -157,6 +157,7 @@ function OrLinkEdge({ id, sourceX, sourceY, targetX, targetY, data }) {
         style={{
           stroke: `url(#${gradientId})`,
           strokeWidth: isSunflowerSameGroup ? 2.4 : 2,
+          fill: 'none',
           pointerEvents: 'none',
           opacity,
           transition: 'opacity 1200ms cubic-bezier(0.22, 1, 0.36, 1)'

@@ -275,6 +275,7 @@ const convertToQuery = (state) => {
   var predQueriesMap = {};
   var predQueriesByNode = {};
   var predicateNestingByNode = {};
+  var pathVariables = []; // Track path variables for proper ordering
   
   for (var i = 0; i < state.nodes.length; i++) {
     var curNode = state.nodes[i];
@@ -286,6 +287,7 @@ const convertToQuery = (state) => {
       simpleReturnVars.push(curNode.data.rep);
     }
 
+    // Process node aggregations
     if (curNode.data.aggregations) {
         if (Array.isArray(curNode.data.aggregations)) {
             curNode.data.aggregations.forEach((agg, idx) => {
@@ -304,7 +306,13 @@ const convertToQuery = (state) => {
                         condition = `${alias} ${agg.operator} ${val}`;
                     }
 
-                    aggregationEntries.push({ expr: aggStr, alias: alias, condition: condition, hasCondition: agg.hasCondition });
+                    aggregationEntries.push({ 
+                        expr: aggStr, 
+                        alias: alias, 
+                        condition: condition, 
+                        hasCondition: agg.hasCondition,
+                        nodeId: curNode.id 
+                    });
                 }
             });
         } else if (typeof curNode.data.aggregations === 'object') {
@@ -313,7 +321,11 @@ const convertToQuery = (state) => {
                 const aggFunc = curNode.data.aggregations[attr];
                 if (aggFunc) {
                   const aggStr = `${aggFunc}(${curNode.data.rep}.${attr})`;
-                  aggregationEntries.push({ expr: aggStr, isLegacy: true });
+                  aggregationEntries.push({ 
+                      expr: aggStr, 
+                      isLegacy: true,
+                      nodeId: curNode.id 
+                  });
                 }
             });
         }
@@ -322,6 +334,8 @@ const convertToQuery = (state) => {
     if (!curNode.data.connected) {
       loneNodeQueries.push(`(${curNode.data.rep}:${curNode.data.label})`);
     }
+    
+    // Process node predicates
     if (curNode.data.predicates) {
       var nodePredQueries = {};
       Object.keys(curNode.data.predicates).forEach(function (attr) {
@@ -346,7 +360,7 @@ const convertToQuery = (state) => {
       }
     }
 
-    // DNF Predicates
+    // DNF Predicates (Disjunctive Normal Form - OR groups with AND within)
     if (curNode.data.dnf && curNode.data.dnf.length > 0) {
         const dnfGroups = curNode.data.dnf.map(row => {
             const rowPreds = row.predicates
@@ -363,6 +377,7 @@ const convertToQuery = (state) => {
         }
     }
   }
+  // OR Links: Union-find implementation for grouping predicates with OR
   var orParents = {};
   Object.keys(predQueriesMap).forEach(function (key) {
     orParents[key] = key;
@@ -383,6 +398,7 @@ const convertToQuery = (state) => {
     }
   };
 
+  // Process OR links from the UI
   if (state.orLinks && state.orLinks.length > 0) {
     state.orLinks.forEach(function (link) {
       unionOR(`${link.from.nodeId}_${link.from.attr}`, `${link.to.nodeId}_${link.to.attr}`);
@@ -416,6 +432,7 @@ const convertToQuery = (state) => {
     });
   });
 
+  // Build nested AND expressions with proper nesting levels
   var emittedGroupRoots = {};
   state.nodes.forEach(function (node) {
     var nodePredQueries = predQueriesByNode[node.id];
@@ -448,8 +465,6 @@ const convertToQuery = (state) => {
 
   var allRsQueries = [];
   var joinNodes = state.nodes.filter(n => n.data.isJoin);
-  console.log("HHH",state.predicateLinks)
-  
 
   for (var i = 0; i < state.edges.length; i++) {
     var srcNode = state.nodes.find((el) => el.id === state.edges[i].source);
@@ -460,8 +475,10 @@ const convertToQuery = (state) => {
 
     var qString;
     var currEdge = state.edges[i];
+    var rsLabel = 'r' + (i + 10).toString(36);
 
-    // Check for hops (cardinality)
+    // ========== FEATURE: Hops (Variable Length Paths) ==========
+    // Supports: -[*x]-> (exact), -[*x..y]-> (range)
     let hops = '';
     let isVarLength = false;
     if (currEdge.data.cardinality) {
@@ -469,12 +486,13 @@ const convertToQuery = (state) => {
         const op = currEdge.data.cardinality.op || '=';
 
         if (op === '=') {
+             // Exact hop count
              if (max !== 1) {
                  hops = `*${max}`;
                  isVarLength = true;
              }
         } else {
-            // range
+            // Range of hops
             if (min !== 1 || max !== 1) {
                 hops = `*${min}..${max}`;
                 isVarLength = true;
@@ -482,86 +500,112 @@ const convertToQuery = (state) => {
         }
     }
 
-    // if directed
+    // ========== FEATURE: Edge Types (Relationship Types) ==========
+    // Build relationship type specification
+    let edgeTypeSpec = '';
+    if (currEdge.data.rs && currEdge.data.rs !== '') {
+        // Single edge type or multiple types (can be specified comma-separated)
+        edgeTypeSpec = currEdge.data.rs;
+    }
+
+    // Construct the edge pattern
     if (currEdge.arrowHeadType !== '') {
-      var rsLabel = 'r' + (i + 10).toString(36);
-      // if rs type is specified
-      if (currEdge.data.rs !== '') {
-        qString = `(${srcNode.data.rep}:${srcNode.data.label})-[${rsLabel}:${currEdge.data.rs}${hops}]->`+
+      // DIRECTED EDGE: -->
+      if (edgeTypeSpec) {
+        qString = `(${srcNode.data.rep}:${srcNode.data.label})-[${rsLabel}:${edgeTypeSpec}${hops}]->`+
         `(${destNode.data.rep}:${destNode.data.label})`;
-        
-        // process edge predicates
-        if (Object.keys(currEdge.data.predicates).length > 0){
-          var edgePredsArr = Object.keys(currEdge.data.predicates).map(function (attr) {
-            const preds = currEdge.data.predicates[attr].data;
-            var predsStringsArr = preds
-              .filter(pred => pred[1] !== '' && pred[1] !== undefined && pred[1] !== null)
-              .map(function (pred) {
-                const op = pred[0];
-                const predVal = formatCypherValue(pred[1]);
-                if (isVarLength) {
-                    return `ALL(rel in ${rsLabel} WHERE rel.${attr} ${Constants.OPERATORS[op]} ${predVal})`;
-                }
-                return `${rsLabel}.${attr} ${Constants.OPERATORS[op]} ${predVal}`;
-              });
-            var predsQueryString = predsStringsArr.join(' AND ');
-            return predsQueryString;
-          });
-          allPredsArr = allPredsArr.concat(edgePredsArr);
-        }
-        if (Array.isArray(currEdge.data.cardinalityProps) && currEdge.data.cardinalityProps.length > 0) {
-          currEdge.data.cardinalityProps.forEach(prop => {
-            if (prop.key && prop.value !== undefined && prop.value !== null && prop.value !== '') {
-              const val = formatCypherValue(prop.value);
-              const op = prop.operator || '=';
-              let pred;
-              if (isVarLength) {
-                  pred = `ALL(rel in ${rsLabel} WHERE rel.${prop.key} ${op} ${val})`;
-              } else {
-                  pred = `${rsLabel}.${prop.key} ${op} ${val}`;
-              }
-              allPredsArr.push(pred);
-            }
-          });
-        }
       } else {
+        // No edge type specified
         if (isVarLength) {
              qString = `(${srcNode.data.rep}:${srcNode.data.label})-[${hops}]->(${destNode.data.rep}:${destNode.data.label})`;
         } else {
              qString = `(${srcNode.data.rep}:${srcNode.data.label})-->(${destNode.data.rep}:${destNode.data.label})`;
         }
       }
-    }
-    // if undirected
-    else {
-      if (isVarLength) {
-          qString = `(${srcNode.data.rep}:${srcNode.data.label})-[${hops}]-(${destNode.data.rep}:${destNode.data.label})`;
+    } else {
+      // UNDIRECTED EDGE: --
+      if (edgeTypeSpec) {
+        qString = `(${srcNode.data.rep}:${srcNode.data.label})-[${rsLabel}:${edgeTypeSpec}${hops}]-`+
+        `(${destNode.data.rep}:${destNode.data.label})`;
       } else {
-          qString = `(${srcNode.data.rep}:${srcNode.data.label})--(${destNode.data.rep}:${destNode.data.label})`;
+        if (isVarLength) {
+            qString = `(${srcNode.data.rep}:${srcNode.data.label})-[${hops}]-(${destNode.data.rep}:${destNode.data.label})`;
+        } else {
+            qString = `(${srcNode.data.rep}:${srcNode.data.label})--(${destNode.data.rep}:${destNode.data.label})`;
+        }
       }
     }
     
-    // Handle Return Path
+    // ========== FEATURE: Edge Predicates (Cardinality Properties) ==========
+    // Process predicates on relationship properties
+    if (currEdge.data.predicates && Object.keys(currEdge.data.predicates).length > 0){
+      var edgePredsArr = Object.keys(currEdge.data.predicates).map(function (attr) {
+        const preds = currEdge.data.predicates[attr].data;
+        var predsStringsArr = preds
+          .filter(pred => pred[1] !== '' && pred[1] !== undefined && pred[1] !== null)
+          .map(function (pred) {
+            const op = pred[0];
+            const predVal = formatCypherValue(pred[1]);
+            if (isVarLength) {
+                // For variable length paths, use ALL to check all relationships
+                return `ALL(rel in ${rsLabel} WHERE rel.${attr} ${Constants.OPERATORS[op]} ${predVal})`;
+            }
+            return `${rsLabel}.${attr} ${Constants.OPERATORS[op]} ${predVal}`;
+          });
+        var predsQueryString = predsStringsArr.join(' AND ');
+        return predsQueryString;
+      });
+      allPredsArr = allPredsArr.concat(edgePredsArr.filter(Boolean));
+    }
+    
+    // Process cardinality properties (properties with constraints on the cardinality)
+    if (Array.isArray(currEdge.data.cardinalityProps) && currEdge.data.cardinalityProps.length > 0) {
+      currEdge.data.cardinalityProps.forEach(prop => {
+        if (prop.key && prop.value !== undefined && prop.value !== null && prop.value !== '') {
+          const val = formatCypherValue(prop.value);
+          const op = prop.operator || '=';
+          let pred;
+          if (isVarLength) {
+              pred = `ALL(rel in ${rsLabel} WHERE rel.${prop.key} ${op} ${val})`;
+          } else {
+              pred = `${rsLabel}.${prop.key} ${op} ${val}`;
+          }
+          allPredsArr.push(pred);
+        }
+      });
+    }
+    
+    // ========== FEATURE: Path Variables ==========
+    // Track paths that should be returned (e.g., p = (a:Node1)-->(b:Node2))
     if (currEdge.data.isPath) {
         const pathVar = `p${i}`;
         qString = `${pathVar} = ${qString}`;
         simpleReturnVars.push(pathVar);
+        pathVariables.push(pathVar);
     }
 
     allRsQueries.push(qString);
   }
 
+  // ========== FEATURE: Joins (Equi and Theta) ==========
+  // Process join predicates that link attributes from different nodes
   if (state.predicateLinks && state.predicateLinks.length > 0) {
     state.predicateLinks.forEach(link => {
-      // Find the node reps for both ends
       const fromNode = state.nodes.find(n => n.id === link.from.nodeId);
       const toNode = state.nodes.find(n => n.id === link.to.nodeId);
+      
       if (fromNode && toNode && fromNode.data.rep && toNode.data.rep) {
         let op = '=';
-        if (link.joinType === 'Theta Join') {
-          op = link.operator || '=';
+        let joinType = link.joinType || 'Equi Join';
+        
+        // Theta Join: use custom operator
+        if (joinType === 'Theta Join' && link.operator) {
+          op = link.operator;
         }
-        allPredsArr.push(`${fromNode.data.rep}.${link.from.attr} ${op} ${toNode.data.rep}.${link.to.attr}`);
+        // Equi Join: always use '='
+        
+        const joinPredicate = `${fromNode.data.rep}.${link.from.attr} ${op} ${toNode.data.rep}.${link.to.attr}`;
+        allPredsArr.push(joinPredicate);
       }
     });
   }
@@ -571,6 +615,7 @@ const convertToQuery = (state) => {
 
   var allPredsQueryString = allPredsArr.length > 0 ? 'WHERE ' + allPredsArr.join(' AND ') : '';
 
+  // Build MATCH clause with both lone nodes and edges
   var loneQueryString = '';
   if (loneNodeQueries.length > 0 && allRsQueries.length > 0) {
     loneQueryString = loneNodeQueries.join(', ') + ', ';
@@ -582,15 +627,37 @@ const convertToQuery = (state) => {
 
   var allRsQueriesString = allRsQueries.join(', ');
 
+  // ========== HANDLE JOIN NODES ==========
+  // Join nodes represent multi-way joins that collect connected nodes
   if (joinNodes.length > 0) {
     var jSymbol = joinNodes[0].data.rep;
-    // Join logic with aggregations is complex, assuming basic aggregation return for now or disabling with Join
+    
+    // If we have aggregations, integrate them with join
+    if (aggregationEntries.length > 0) {
+      const withClauseVars = [jSymbol, ...aggregationEntries.map((a, idx) => {
+        const alias = a.alias || `agg_${idx}`;
+        a.finalAlias = alias;
+        return `${a.expr} AS ${alias}`;
+      })];
+      
+      return [
+        `MATCH ${loneQueryString}${allRsQueriesString}`,
+        allPredsQueryString,
+        `WITH ${withClauseVars.join(', ')}`,
+        `OPTIONAL MATCH (${jSymbol})--(o)`,
+        `RETURN ${jSymbol}, COLLECT(o) AS others, ${aggregationEntries.map(a => a.finalAlias).join(', ')}`
+      ].filter(val => val && val.trim() !== '').join('\n');
+    }
+    
+    // Standard join without aggregations
     return `MATCH ${loneQueryString}${allRsQueriesString}
 ${allPredsQueryString}
 OPTIONAL MATCH (${jSymbol})--(o)
 RETURN ${jSymbol}, COLLECT(o) AS others`;
   }
   
+  // ========== FEATURE: Aggregations with Conditions ==========
+  // When aggregations have conditions, use WITH clause to filter aggregation results (HAVING-like)
   const hasAggConditions = aggregationEntries.some(a => a.hasCondition);
   
   if (hasAggConditions) {
@@ -611,9 +678,10 @@ RETURN ${jSymbol}, COLLECT(o) AS others`;
 
       const whereStr = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
       
+      // Order return variables: simple vars first, then aggregations, then path variables
       const finalReturnVars = [
           ...simpleReturnVars,
-          ...aggregationEntries.map(a => a.finalAlias)
+          ...aggregationEntries.map(a => a.finalAlias ? a.finalAlias : (a.alias ? a.alias : a.expr))
       ];
 
       return [
@@ -624,17 +692,30 @@ RETURN ${jSymbol}, COLLECT(o) AS others`;
         `RETURN ${finalReturnVars.join(', ')}`
       ].filter(val => val && val.trim() !== '').join('\n');
 
-  } else {
-      // Standard return
+  } else if (aggregationEntries.length > 0) {
+      // ========== FEATURE: Simple Aggregations (No Conditions) ==========
+      // Standard return with aggregations
       const finalReturnVars = [
           ...simpleReturnVars, 
-          ...aggregationEntries.map(a => a.alias ? `${a.expr} AS ${a.alias}` : a.expr)
+          ...aggregationEntries.map(a => {
+              if (a.alias) return `${a.expr} AS ${a.alias}`;
+              if (a.isLegacy) return a.expr;
+              return `${a.expr} AS agg_${state.nodes.find(n => n.id === a.nodeId)?.id}`;
+          })
       ];
       
       return [
         `MATCH ${loneQueryString}${allRsQueriesString}`,
         allPredsQueryString,
         `RETURN ${finalReturnVars.join(', ')}`
+      ].filter(val => val && val.trim() !== '').join('\n');
+  } else {
+      // ========== STANDARD QUERY (No Aggregations, No Joins) ==========
+      // Simple MATCH WHERE RETURN query
+      return [
+        `MATCH ${loneQueryString}${allRsQueriesString}`,
+        allPredsQueryString,
+        `RETURN ${simpleReturnVars.join(', ')}`
       ].filter(val => val && val.trim() !== '').join('\n');
   }
 

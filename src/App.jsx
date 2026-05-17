@@ -790,7 +790,7 @@ function App() {
         const targetGroupId = orGroupRoots[toKey];
         const isSameNode = String(link.from.nodeId) === String(link.to.nodeId);
         const isSameGroup = !!sourceGroupId && !!targetGroupId && sourceGroupId === targetGroupId;
-        if (state.orRepresentation === 'sunflower' && isSameGroup) {
+        if (state.orRepresentation === 'sunflower' && isSameNode && isSameGroup) {
           return null;
         }
         const groupId = sourceGroupId || targetGroupId || fromKey;

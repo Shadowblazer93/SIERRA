@@ -19,7 +19,7 @@ import { StreamLanguage } from '@codemirror/stream-parser';
 import { EditorView } from '@codemirror/view';
 import { cypher } from '@codemirror/legacy-modes/mode/cypher';
 import ReactFlow, { ReactFlowProvider, Background, Handle } from 'react-flow-renderer';
-import { PRED_COLOR_V2, OPERATORS } from '../../constants';
+import { PRED_COLOR_V2, OPERATORS, ENABLE_DNF_BUILDER } from '../../constants';
 import { Context } from '../../Store';
 import { PredicateDraw, PredicateCheckBox } from '../common';
 import Predicate from '../Predicate';
@@ -1744,13 +1744,17 @@ const NodePredicateModal = ({
           </Button>
         </div> */}
 
-        <Divider orientation="left">DNF Query Builder</Divider>
-        <DNFBuilder 
-            attributes={attributes} 
-            propData={propData} 
-            initialData={dnf} 
-            onSave={handleSaveDNF} 
-        />
+        {ENABLE_DNF_BUILDER && (
+          <>
+            <Divider orientation="left">DNF Query Builder</Divider>
+            <DNFBuilder 
+                attributes={attributes} 
+                propData={propData} 
+                initialData={dnf} 
+                onSave={handleSaveDNF} 
+            />
+          </>
+        )}
 
         <Divider orientation="left">Possible Targets</Divider>
         <div style={{padding: '0px 15px 10px'}}>

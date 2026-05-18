@@ -1038,7 +1038,8 @@ function App() {
               )));
             }}
             onRestore={restoreQueryGraph}
-            onClearHistory={() => setQueryClipboardHistory([])}
+            onClearHistory={() => setQueryClipboardHistory((prev) => prev.filter((item) => item.starred))}
+            onDelete={(id) => setQueryClipboardHistory((prev) => prev.filter((item) => item.id !== id))}
           />
           <ReactFlowProvider>
             <CypherTextEditor text={cypherQuery}/>

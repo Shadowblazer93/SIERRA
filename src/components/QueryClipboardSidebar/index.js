@@ -1,6 +1,6 @@
 import React from 'react';
 import { Drawer, Tabs, Empty, Button, Typography } from 'antd';
-import { StarOutlined, StarFilled, CopyOutlined } from '@ant-design/icons';
+import { StarOutlined, StarFilled, CopyOutlined, DeleteOutlined } from '@ant-design/icons';
 import CodeMirror from '@uiw/react-codemirror';
 import { StreamLanguage } from '@codemirror/stream-parser';
 import { cypher } from '@codemirror/legacy-modes/mode/cypher';
@@ -20,7 +20,7 @@ function formatExecutedAt(executedAt) {
   }
 }
 
-function QueryCard({ item, onToggleStar, onRestore }) {
+function QueryCard({ item, onToggleStar, onRestore, onDelete }) {
   return (
     <div
       className="query-clipboard-card"
@@ -46,6 +46,13 @@ function QueryCard({ item, onToggleStar, onRestore }) {
             icon={item.starred ? <StarFilled /> : <StarOutlined />}
             onClick={() => onToggleStar(item.id)}
           />
+          <Button
+            type="text"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => onDelete(item.id)}
+          />
         </div>
       </div>
 
@@ -62,7 +69,7 @@ function QueryCard({ item, onToggleStar, onRestore }) {
   );
 }
 
-export default function QueryClipboardSidebar({ visible, onClose, history, onToggleStar, onRestore, onClearHistory }) {
+export default function QueryClipboardSidebar({ visible, onClose, history, onToggleStar, onRestore, onClearHistory, onDelete }) {
   const starred = history.filter((item) => item.starred);
 
   const renderList = (items, emptyLabel) => {
@@ -73,7 +80,7 @@ export default function QueryClipboardSidebar({ visible, onClose, history, onTog
     return (
       <div className="query-clipboard-list">
         {items.slice().reverse().map((item) => (
-          <QueryCard key={item.id} item={item} onToggleStar={onToggleStar} onRestore={onRestore} />
+          <QueryCard key={item.id} item={item} onToggleStar={onToggleStar} onRestore={onRestore} onDelete={onDelete} />
         ))}
       </div>
     );

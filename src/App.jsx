@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
 import Node from './components/Node';
+import AuthPage from './components/AuthPage';
 import ReactFlow, { Controls, isEdge, addEdge, removeElements, Background, useStoreState, ReactFlowProvider } from 'react-flow-renderer';
 import NewNodeDrawButton from './components/NewNodeDrawButton';
 import PredicateDisplayDropDown from './components/PredicateDisplayDropDown';
@@ -15,7 +16,7 @@ import AndLinkEdge from './components/AndLinkEdge';
 import PredicateLinkModal from './components/PredicateLinkModal';
 import ConfirmationAlert from './components/ConfirmationAlert';
 import {Button, Spin, Select, Drawer, Modal, Form, Input, Row, Col, message} from 'antd';
-import {InfoCircleOutlined, CopyOutlined, LoadingOutlined, ApiOutlined, ArrowLeftOutlined, NodeIndexOutlined, EyeOutlined, EditOutlined, SettingOutlined, SnippetsOutlined} from '@ant-design/icons'
+import {InfoCircleOutlined, BuildOutlined, CopyOutlined, LoadingOutlined, ApiOutlined, ArrowLeftOutlined, NodeIndexOutlined, EyeOutlined, EditOutlined, SettingOutlined, SnippetsOutlined} from '@ant-design/icons'
 import Title from 'antd/lib/typography/Title';
 import { getNodeId } from './utils/getNodeId';
 import useVisualActions from './hooks/useVisualActions'
@@ -55,6 +56,10 @@ const loadQueryClipboard = () => {
 function App() {
   const VA = useVisualActions()
   const [state, dispatch] = useContext(Context);
+  const isAuthRoute = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return window.location.pathname.toLowerCase().includes('auth');
+  }, []);
   const [pageStatus, setPageStatus] = useState('LOADING');
   const [showResults, setShowResults] = useState(false);
   const [searchResult, setSearchResult] = useState([]);
@@ -80,6 +85,9 @@ function App() {
   const [queryClipboardHistory, setQueryClipboardHistory] = useState(() => loadQueryClipboard());
   const suppressQuerySyncRef = useRef(false);
   const [queryControlsVisible, setQueryControlsVisible] = useState(false);
+  const [showcaseModalVisible, setShowcaseModalVisible] = useState(false);
+  const [showcaseJson, setShowcaseJson] = useState('');
+  const reactFlowInstanceRef = useRef(null);
   
   const [queryOptions, setQueryOptions] = useState({
     limit: '',
@@ -89,6 +97,43 @@ function App() {
     withClauses: [], // Changed from withClause string to array of objects { expression, alias }
     returnClause: ''
   });
+
+  const buildShowcaseSnapshot = () => {
+    const now = new Date();
+    const viewport = reactFlowInstanceRef.current?.toObject?.().viewport;
+    return {
+      id: `showcase-${now.getTime()}`,
+      name: `Showcase ${now.toISOString()}`,
+      createdAt: now.toISOString(),
+      graph: {
+        nodes: state.nodes,
+        edges: state.edges,
+        predicateLinks: state.predicateLinks,
+        orLinks: state.orLinks,
+        andLinks: state.andLinks,
+        predDisplayStatus: state.predDisplayStatus,
+        orRepresentation: state.orRepresentation,
+        dnfMode: state.dnfMode,
+        dnfLinksVisible: state.dnfLinksVisible,
+        dnfAndGroupingEnabled: state.dnfAndGroupingEnabled,
+        dnfHoverCount: state.dnfHoverCount,
+        dnfHovering: state.dnfHovering
+      },
+      orGroupColors: { ...orGroupColorsRef.current },
+      viewport: viewport || null
+    };
+  };
+
+  const handleSaveShowcase = async () => {
+    try {
+      const snapshot = buildShowcaseSnapshot();
+      const json = JSON.stringify(snapshot, null, 2);
+      setShowcaseJson(json);
+      setShowcaseModalVisible(true);
+    } catch (error) {
+      message.error(`Failed to build showcase JSON: ${error}`);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -865,6 +910,10 @@ function App() {
     </div>
   );
 
+  if (isAuthRoute) {
+    return <AuthPage />;
+  }
+
   return (
     <div className="App" id="app-root">
       {loadingOverlay}
@@ -948,6 +997,20 @@ function App() {
                   onClick={() => queryControlsRef.current?.openSettings()}
                 />
               </div>
+              <Button
+                type="default"
+                shape="circle"
+                icon={<BuildOutlined />}
+                size="small"
+                onClick={handleSaveShowcase}
+                disabled={state.nodes.length === 0}
+                style={{
+                  position: 'fixed',
+                  right: 18,
+                  bottom: 18,
+                  zIndex: 30
+                }}
+              />
               <Button
                 style={{
                   width: 120,
@@ -1080,6 +1143,9 @@ function App() {
               style={{ width: '100%', height: '100vh' }}
               nodeTypes={{ special: Node }}
               edgeTypes={{ custom: CustomEdge, predicateLink: PredicateLinkEdge, orLink: OrLinkEdge, andLink: AndLinkEdge }}
+              onLoad={(instance) => {
+                reactFlowInstanceRef.current = instance;
+              }}
               onElementsRemove={(elementsToRemove) =>
                 setToastInfo({
                   show: true,
@@ -1118,6 +1184,41 @@ function App() {
             onDelete={handleDeleteLink}
             onUpdate={handleUpdateLink}
           />
+
+          <Modal
+            title="Showcase JSON"
+            visible={showcaseModalVisible}
+            onCancel={() => setShowcaseModalVisible(false)}
+            footer={[
+              <Button
+                key="copy"
+                type="primary"
+                onClick={async () => {
+                  try {
+                    if (navigator?.clipboard?.writeText) {
+                      await navigator.clipboard.writeText(showcaseJson);
+                      message.success('Showcase JSON copied to clipboard.');
+                    }
+                  } catch (error) {
+                    message.error(`Failed to copy showcase JSON: ${error}`);
+                  }
+                }}
+              >
+                Copy JSON
+              </Button>,
+              <Button key="close" onClick={() => setShowcaseModalVisible(false)}>
+                Close
+              </Button>
+            ]}
+            width={720}
+          >
+            <Input.TextArea
+              value={showcaseJson}
+              autoSize={{ minRows: 10, maxRows: 22 }}
+              readOnly
+              style={{fontFamily: 'monospace'}}
+            />
+          </Modal>
           
           <Modal
             title="Connect to Database"

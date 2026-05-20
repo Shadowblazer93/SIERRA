@@ -1,7 +1,7 @@
 import React, { createContext, useReducer } from 'react';
 import Reducer from './Reducer';
 
-const initialState = {
+export const initialState = {
   nodes: [],
   edges: [],
   entities: [],

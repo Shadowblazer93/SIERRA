@@ -1,0 +1,403 @@
+[
+    {
+        "id": "showcase-1779202614703",
+        "name": "Showcase 2026-05-19T14:56:54.703Z",
+        "createdAt": "2026-05-19T14:56:54.703Z",
+        "graph": {
+            "nodes": [
+            {
+                "id": "0",
+                "position": {
+                "x": 500,
+                "y": 200
+                },
+                "type": "special",
+                "data": {
+                "label": "Product",
+                "attributes": [
+                    "productName",
+                    "quantityPerUnit",
+                    "unitsOnOrder",
+                    "supplierID",
+                    "productID",
+                    "discontinued",
+                    "categoryID",
+                    "reorderLevel",
+                    "unitsInStock",
+                    "unitPrice"
+                ],
+                "possibleTargets": [
+                    "Category"
+                ],
+                "connected": true,
+                "isJoin": false,
+                "predicates": {
+                    "supplierID": {
+                    "id": "supplierID",
+                    "position": {
+                        "x": 62,
+                        "y": 82
+                    },
+                    "data": [
+                        [
+                        "0",
+                        "3"
+                        ]
+                    ],
+                    "color": {
+                        "name": "orange",
+                        "primary": "#d46b08",
+                        "light": "#fff7e6",
+                        "secondary": "#ffd591"
+                    },
+                    "isBold": false,
+                    "componentType": "PREDICATE",
+                    "radius": 8
+                    }
+                },
+                "VEDAPosition": [
+                    "supplierID"
+                ],
+                "rep": "a",
+                "dnfParticipates": false
+                },
+                "color": "MistyRose",
+                "isBold": true,
+                "componentType": "NODE",
+                "radius": 48,
+                "ranTheta": 0.14283934711763663
+            },
+            {
+                "id": "1",
+                "position": {
+                "x": 700,
+                "y": 200
+                },
+                "type": "special",
+                "data": {
+                "label": "Category",
+                "attributes": [
+                    "picture",
+                    "categoryID",
+                    "description",
+                    "categoryName"
+                ],
+                "possibleTargets": [],
+                "connected": true,
+                "isJoin": false,
+                "predicates": {
+                    "categoryID": {
+                    "id": "categoryID",
+                    "position": {
+                        "x": 16,
+                        "y": -2
+                    },
+                    "data": [
+                        [
+                        "0",
+                        "2"
+                        ]
+                    ],
+                    "color": {
+                        "name": "red",
+                        "primary": "#cf1322",
+                        "light": "#fff1f0",
+                        "secondary": "#ffa39e"
+                    },
+                    "isBold": false,
+                    "componentType": "PREDICATE",
+                    "radius": 8
+                    }
+                },
+                "VEDAPosition": [
+                    "categoryID"
+                ],
+                "rep": "b"
+                },
+                "color": "LightSteelBlue",
+                "isBold": true,
+                "componentType": "NODE",
+                "radius": 48,
+                "ranTheta": 4.514240907459237
+            }
+            ],
+            "edges": [
+            {
+                "id": "e0-1",
+                "data": {
+                "source": "Product",
+                "destination": "Category",
+                "rs": "",
+                "relationships": [
+                    {
+                    "label": "Category",
+                    "props": [],
+                    "type": "PART_OF"
+                    }
+                ],
+                "predicates": {},
+                "sourcePredicates": {
+                    "supplierID": {
+                    "id": "supplierID",
+                    "position": {
+                        "x": 62,
+                        "y": 82
+                    },
+                    "data": [
+                        [
+                        "0",
+                        "3"
+                        ]
+                    ],
+                    "color": {
+                        "name": "orange",
+                        "primary": "#d46b08",
+                        "light": "#fff7e6",
+                        "secondary": "#ffd591"
+                    },
+                    "isBold": false,
+                    "componentType": "PREDICATE",
+                    "radius": 8
+                    }
+                },
+                "targetPredicates": {
+                    "categoryID": {
+                    "id": "categoryID",
+                    "position": {
+                        "x": 16,
+                        "y": -2
+                    },
+                    "data": [
+                        [
+                        "0",
+                        "2"
+                        ]
+                    ],
+                    "color": {
+                        "name": "red",
+                        "primary": "#cf1322",
+                        "light": "#fff1f0",
+                        "secondary": "#ffa39e"
+                    },
+                    "isBold": false,
+                    "componentType": "PREDICATE",
+                    "radius": 8
+                    }
+                },
+                "cardinality": {
+                    "min": 1,
+                    "max": 2,
+                    "op": "range"
+                }
+                },
+                "source": "0",
+                "target": "1",
+                "arrowHeadType": "arrowclosed",
+                "type": "custom"
+            }
+            ],
+            "predicateLinks": [],
+            "orLinks": [
+            {
+                "from": {
+                "nodeId": "0",
+                "attr": "supplierID"
+                },
+                "to": {
+                "nodeId": "1",
+                "attr": "categoryID"
+                }
+            }
+            ],
+            "andLinks": [],
+            "predDisplayStatus": "FULL",
+            "orRepresentation": "sunflower",
+            "dnfMode": false,
+            "dnfLinksVisible": false,
+            "dnfAndGroupingEnabled": false,
+            "dnfHoverCount": 0,
+            "dnfHovering": false
+        },
+        "orGroupColors": {
+            "1_categoryID": "#53797f"
+        },
+        "viewport": null
+    },
+    {
+        "id": "showcase-1779202715258",
+        "name": "Showcase 2026-05-19T14:58:35.258Z",
+        "createdAt": "2026-05-19T14:58:35.258Z",
+        "graph": {
+            "nodes": [
+            {
+                "id": "0",
+                "position": {
+                "x": 500,
+                "y": 200
+                },
+                "type": "special",
+                "data": {
+                "label": "Product",
+                "attributes": [
+                    "productName",
+                    "quantityPerUnit",
+                    "unitsOnOrder",
+                    "supplierID",
+                    "productID",
+                    "discontinued",
+                    "categoryID",
+                    "reorderLevel",
+                    "unitsInStock",
+                    "unitPrice"
+                ],
+                "possibleTargets": [
+                    "Category"
+                ],
+                "connected": true,
+                "isJoin": false,
+                "predicates": {
+                    "unitsOnOrder": {
+                    "id": "unitsOnOrder",
+                    "position": {
+                        "x": 9,
+                        "y": 8
+                    },
+                    "data": [
+                        [
+                        "0",
+                        70
+                        ]
+                    ],
+                    "color": {
+                        "name": "volcano",
+                        "primary": "#d4380d",
+                        "light": "#fff2e8",
+                        "secondary": "#ffbb96"
+                    },
+                    "isBold": false,
+                    "componentType": "PREDICATE",
+                    "radius": 8
+                    },
+                    "discontinued": {
+                    "id": "discontinued",
+                    "position": {
+                        "x": 64,
+                        "y": -6
+                    },
+                    "data": [
+                        [
+                        "0",
+                        false
+                        ]
+                    ],
+                    "color": {
+                        "name": "lime",
+                        "primary": "#7cb305",
+                        "light": "#fcffe6",
+                        "secondary": "#eaff8f"
+                    },
+                    "isBold": false,
+                    "componentType": "PREDICATE",
+                    "radius": 8
+                    }
+                },
+                "VEDAPosition": [
+                    "unitsOnOrder",
+                    "discontinued"
+                ],
+                "rep": "a",
+                "dnfParticipates": false
+                },
+                "color": "PaleGreen",
+                "isBold": true,
+                "componentType": "NODE",
+                "radius": 56,
+                "ranTheta": 4.470887760688586
+            },
+            {
+                "id": "1",
+                "position": {
+                "x": 700,
+                "y": 200
+                },
+                "type": "special",
+                "data": {
+                "label": "Category",
+                "attributes": [
+                    "picture",
+                    "categoryID",
+                    "description",
+                    "categoryName"
+                ],
+                "possibleTargets": [],
+                "connected": true,
+                "isJoin": false,
+                "predicates": {},
+                "VEDAPosition": [],
+                "rep": "b",
+                "aggregations": [
+                    {
+                    "attribute": "picture",
+                    "function": "COUNT",
+                    "hasCondition": true,
+                    "alias": "asd",
+                    "operator": ">",
+                    "value": "3"
+                    }
+                ]
+                },
+                "color": "Aquamarine",
+                "isBold": true,
+                "componentType": "NODE",
+                "radius": 40,
+                "ranTheta": 2.8977011524519596
+            }
+            ],
+            "edges": [
+            {
+                "id": "e0-1",
+                "data": {
+                "source": "Product",
+                "destination": "Category",
+                "rs": "",
+                "relationships": [
+                    {
+                    "label": "Category",
+                    "props": [],
+                    "type": "PART_OF"
+                    }
+                ],
+                "predicates": {}
+                },
+                "source": "0",
+                "target": "1",
+                "arrowHeadType": "arrowclosed",
+                "type": "custom"
+            }
+            ],
+            "predicateLinks": [],
+            "orLinks": [
+            {
+                "from": {
+                "nodeId": "0",
+                "attr": "discontinued"
+                },
+                "to": {
+                "nodeId": "0",
+                "attr": "unitsOnOrder"
+                }
+            }
+            ],
+            "andLinks": [],
+            "predDisplayStatus": "FULL",
+            "orRepresentation": "sunflower",
+            "dnfMode": false,
+            "dnfLinksVisible": false,
+            "dnfAndGroupingEnabled": false,
+            "dnfHoverCount": 0,
+            "dnfHovering": false
+        },
+        "orGroupColors": {},
+        "viewport": null
+    }
+]

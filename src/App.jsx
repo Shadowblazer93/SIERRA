@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
+import * as DarkReader from 'darkreader';
 import Node from './components/Node';
 import AuthPage from './components/AuthPage';
 import ReactFlow, { Controls, isEdge, addEdge, removeElements, Background, useStoreState, ReactFlowProvider } from 'react-flow-renderer';
@@ -28,11 +29,20 @@ import { buildDnfAndLinksFromQuery } from './utils/dnfGraph';
 import { buildOrGroupRoots } from './utils/orGroupRoots';
 import { resetCurAvailId, undoResetNodeId } from './utils/getNodeId';
 import { PRED_COLOR_V2 } from './constants';
+import darkreaderThemes from './darkreaderThemes.json';
 const neo4jApi = require('./neo4jApi')
 const pkg = require('../package.json')
 
 const api = require('./neo4jApi');
 const QUERY_CLIPBOARD_STORAGE_KEY = 'sierra-query-clipboard';
+const THEME_STORAGE_KEY = 'sierra-theme-mode';
+const THEME_PRESET_STORAGE_KEY = 'sierra-darkreader-theme';
+const DARKREADER_PRESETS = (darkreaderThemes || []).reduce((acc, theme) => {
+  if (theme && theme.id && theme.config) {
+    acc[theme.id] = theme.config;
+  }
+  return acc;
+}, {});
 
 const createPastelColor = () => {
   const hue = Math.floor(Math.random() * 360);
@@ -88,6 +98,27 @@ function App() {
   const [showcaseModalVisible, setShowcaseModalVisible] = useState(false);
   const [showcaseJson, setShowcaseJson] = useState('');
   const reactFlowInstanceRef = useRef(null);
+  const [darkModeEnabled, setDarkModeEnabled] = useState(() => {
+    if (typeof window === 'undefined') return false;
+
+    try {
+      return window.localStorage.getItem(THEME_STORAGE_KEY) === 'dark';
+    } catch (error) {
+      return false;
+    }
+  });
+  const [darkThemePreset, setDarkThemePreset] = useState(() => {
+    if (typeof window === 'undefined') return 'materialdark';
+
+    try {
+      const stored = window.localStorage.getItem(THEME_PRESET_STORAGE_KEY);
+      return stored && DARKREADER_PRESETS[stored] ? stored : 'materialdark';
+    } catch (error) {
+      return 'materialdark';
+    }
+  });
+
+  const shouldEnableDarkMode = darkModeEnabled && pageStatus === 'READY';
   
   const [queryOptions, setQueryOptions] = useState({
     limit: '',
@@ -142,6 +173,25 @@ function App() {
       // Ignore storage failures so query execution stays usable.
     }
   }, [queryClipboardHistory]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, darkModeEnabled ? 'dark' : 'light');
+      window.localStorage.setItem(THEME_PRESET_STORAGE_KEY, darkThemePreset);
+    } catch (error) {
+      // Ignore storage failures so theme toggling keeps working.
+    }
+
+    if (shouldEnableDarkMode) {
+      const preset = DARKREADER_PRESETS[darkThemePreset] || DARKREADER_PRESETS.materialdark;
+      DarkReader.disable();
+      DarkReader.enable(preset);
+    } else {
+      DarkReader.disable();
+    }
+  }, [darkModeEnabled, darkThemePreset, shouldEnableDarkMode]);
 
   const [connectModalVisible, setConnectModalVisible] = useState(false);
   const [form] = Form.useForm();
@@ -915,7 +965,7 @@ function App() {
   }
 
   return (
-    <div className="App" id="app-root">
+    <div className={`App ${shouldEnableDarkMode ? 'dark-mode' : ''}`} id="app-root">
       {loadingOverlay}
       
       <>
@@ -1090,6 +1140,11 @@ function App() {
             onToggleDnfAndGrouping={(enabled) => {
               dispatch({ type: 'SET_DNF_AND_GROUPING', payload: enabled });
             }}
+            darkModeEnabled={darkModeEnabled}
+            onToggleDarkMode={setDarkModeEnabled}
+            darkThemePreset={darkThemePreset}
+            onThemePresetChange={setDarkThemePreset}
+            themePresets={darkreaderThemes}
           />
           <QueryClipboardSidebar
             visible={queryClipboardVisible}

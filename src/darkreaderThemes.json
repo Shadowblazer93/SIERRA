@@ -1,0 +1,100 @@
+[
+  {
+    "id": "materialdark",
+    "label": "MaterialDark",
+    "config": {
+        "brightness": 97,
+        "contrast": 102,
+        "sepia": 6,
+
+        "mode": 1,
+        "grayscale": 0,
+
+        "darkSchemeBackgroundColor": "#14141a",
+
+        "scrollbarColor": "#546e7a",
+        "selectionColor": "#37474f",
+
+        "styleSystemControls": true,
+
+        "fontFamily": "Roboto, Inter, sans-serif",
+        "textStroke": 0
+        }
+  },
+  {
+    "id": "dracula",
+    "label": "Dracula",
+    "config": {
+        "brightness": 95,
+        "contrast": 110,
+        "sepia": 10,
+
+        "mode": 1,
+        "grayscale": 0,
+
+        "darkSchemeBackgroundColor": "#282a36",
+
+        "scrollbarColor": "#6272a4",
+        "selectionColor": "#44475a",
+
+        "styleSystemControls": true
+        }
+  },
+  {
+    "id": "catppuccin",
+    "label": "Catppuccin Mocha",
+    "config": {
+        "brightness": 94,
+        "contrast": 105,
+        "sepia": 8,
+
+        "mode": 1,
+        "grayscale": 0,
+
+        "darkSchemeBackgroundColor": "#1e1e2e",
+
+        "scrollbarColor": "#6c7086",
+        "selectionColor": "#585b70",
+
+        "styleSystemControls": true
+        }
+  },
+  {
+    "id": "nord",
+    "label": "Nord",
+    "config": {
+        "brightness": 96,
+        "contrast": 100,
+        "sepia": 12,
+
+        "mode": 1,
+        "grayscale": 0,
+
+        "darkSchemeBackgroundColor": "#2e3440",
+
+        "scrollbarColor": "#4c566a",
+        "selectionColor": "#434c5e",
+
+        "styleSystemControls": true
+        }
+  },
+  {
+    "id": "gruvbox",
+    "label": "Gruvbox",
+    "config": {
+        "brightness": 93,
+        "contrast": 105,
+        "sepia": 18,
+
+        "mode": 1,
+        "grayscale": 0,
+
+        "darkSchemeBackgroundColor": "#282828",
+
+        "scrollbarColor": "#665c54",
+        "selectionColor": "#504945",
+
+        "styleSystemControls": true
+        }
+  }
+]

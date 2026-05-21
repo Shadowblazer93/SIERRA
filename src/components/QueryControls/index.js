@@ -15,7 +15,12 @@ const QueryControls = forwardRef(({
   onToggleDnfLinks,
   dnfAndGroupingEnabled,
   onToggleDnfAndGrouping,
-  onVisibleChange
+  onVisibleChange,
+  darkModeEnabled,
+  onToggleDarkMode,
+  darkThemePreset,
+  onThemePresetChange,
+  themePresets
 }, ref) => {
   const [limit, setLimit] = useState(options.limit || '');
   const [skip, setSkip] = useState(options.skip || '');
@@ -213,6 +218,39 @@ const QueryControls = forwardRef(({
               footer={null}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <Text strong style={{fontSize:18, color:'#606060'}}>Website</Text>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <Text strong>Dark Mode</Text>
+                  </div>
+                  <Switch
+                    checked={!!darkModeEnabled}
+                    onChange={(checked) => onToggleDarkMode && onToggleDarkMode(checked)}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <Text strong>Theme</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Dark Reader preset.
+                    </Text>
+                  </div>
+                  <Select
+                    value={darkThemePreset || 'default'}
+                    onChange={(value) => onThemePresetChange && onThemePresetChange(value)}
+                    size="small"
+                    style={{ width: 180 }}
+                    disabled={!darkModeEnabled}
+                  >
+                    {(themePresets || []).map((preset) => (
+                      <Option key={preset.id} value={preset.id}>
+                        {preset.label || preset.id}
+                      </Option>
+                    ))}
+                  </Select>
+                </div>
+                <Divider style={{ margin: '4px 0' }} />
+                <Text strong style={{fontSize:18, color:'#606060'}}>Graph</Text>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <Text strong>Show DNF Links</Text>

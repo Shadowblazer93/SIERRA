@@ -267,6 +267,15 @@ const formatCypherValue = (value) => {
   return `'${escapedBackslashes.replace(/'/g, "\\'")}'`;
 };
 
+const formatCypherIdentifier = (identifier) => {
+  if (identifier === undefined || identifier === null) return identifier;
+  const raw = String(identifier);
+  const unwrapped = raw.startsWith('`') && raw.endsWith('`')
+    ? raw.slice(1, -1)
+    : raw;
+  return `\`${unwrapped.replace(/`/g, '``')}\``;
+};
+
 const convertToQuery = (state) => {
   var loneNodeQueries = [];
   var simpleReturnVars = []; // For nodes and edge paths (non-aggregated)
@@ -276,12 +285,15 @@ const convertToQuery = (state) => {
   var predQueriesByNode = {};
   var predicateNestingByNode = {};
   var pathVariables = []; // Track path variables for proper ordering
+  var nodeRepById = {};
   
   for (var i = 0; i < state.nodes.length; i++) {
     var curNode = state.nodes[i];
     if (!curNode.data['rep']) {
       curNode.data['rep'] = (parseInt(curNode.id) + 10).toString(36);
     }
+
+    nodeRepById[curNode.id] = curNode.data.rep;
 
     if (curNode.isBold) {
       simpleReturnVars.push(curNode.data.rep);
@@ -303,7 +315,7 @@ const convertToQuery = (state) => {
                         // Simple check if value is numeric string
                         const isNum = !isNaN(parseFloat(agg.value)) && isFinite(agg.value);
                         const val = isNum ? agg.value : formatCypherValue(agg.value);
-                        condition = `${alias} ${agg.operator} ${val}`;
+                      condition = `${formatCypherIdentifier(alias)} ${agg.operator} ${val}`;
                     }
 
                     aggregationEntries.push({ 
@@ -613,6 +625,40 @@ const convertToQuery = (state) => {
   allPredsArr = allPredsArr.filter(Boolean); // Remove falsy (empty) strings
   allPredsArr = Array.from(new Set(allPredsArr)); // Remove duplicates
 
+  if (aggregationEntries.length > 0) {
+    const aggregatedNodeReps = new Set(
+      aggregationEntries
+        .map((entry) => nodeRepById[entry.nodeId])
+        .filter(Boolean)
+    );
+
+    simpleReturnVars = simpleReturnVars.filter((rep) => !aggregatedNodeReps.has(rep));
+  }
+
+  // Collect GROUP BY expressions from nodes (node.data.groupBy)
+  var groupByEntries = []; // { expr, alias, withExpr, returnExpr }
+  state.nodes.forEach(function (node) {
+    if (node && node.data && Array.isArray(node.data.groupBy) && node.data.groupBy.length > 0) {
+      const rep = node.data.rep || nodeRepById[node.id] || `n${String(node.id).replace(/[^A-Za-z0-9_]/g, '_')}`;
+      node.data.groupBy.forEach(function (item) {
+        if (!item) return;
+        let attr = null;
+        let alias = null;
+        if (typeof item === 'string') {
+          attr = item;
+        } else if (typeof item === 'object') {
+          attr = item.attr;
+          alias = item.alias;
+        }
+        if (!attr) return;
+        const expr = `${rep}.${attr}`;
+        const withExpr = (alias && `${expr} AS ${formatCypherIdentifier(alias)}`) || expr;
+        const returnExpr = (alias && formatCypherIdentifier(alias)) || expr;
+        groupByEntries.push({ expr, alias, withExpr, returnExpr });
+      });
+    }
+  });
+
   var allPredsQueryString = allPredsArr.length > 0 ? 'WHERE ' + allPredsArr.join(' AND ') : '';
 
   // Build MATCH clause with both lone nodes and edges
@@ -636,24 +682,28 @@ const convertToQuery = (state) => {
     if (aggregationEntries.length > 0) {
       const withClauseVars = [jSymbol, ...aggregationEntries.map((a, idx) => {
         const alias = a.alias || `agg_${idx}`;
-        a.finalAlias = alias;
-        return `${a.expr} AS ${alias}`;
+        a.finalAlias = formatCypherIdentifier(alias);
+        return `${a.expr} AS ${a.finalAlias}`;
       })];
-      
+      // include any group-by vars in the WITH if present
+      if (groupByEntries.length > 0) {
+        // prepend groupBy expressions after jSymbol
+        withClauseVars.splice(1, 0, ...groupByEntries.map(e => e.withExpr));
+      }
       return [
         `MATCH ${loneQueryString}${allRsQueriesString}`,
         allPredsQueryString,
         `WITH ${withClauseVars.join(', ')}`,
         `OPTIONAL MATCH (${jSymbol})--(o)`,
-        `RETURN ${jSymbol}, COLLECT(o) AS others, ${aggregationEntries.map(a => a.finalAlias).join(', ')}`
+        `RETURN ${jSymbol}, COLLECT(o) AS others${groupByEntries.length > 0 ? ', ' + groupByEntries.map(e => e.returnExpr).join(', ') : ''}, ${aggregationEntries.map(a => a.finalAlias).join(', ')}`
       ].filter(val => val && val.trim() !== '').join('\n');
     }
     
     // Standard join without aggregations
     return `MATCH ${loneQueryString}${allRsQueriesString}
-${allPredsQueryString}
-OPTIONAL MATCH (${jSymbol})--(o)
-RETURN ${jSymbol}, COLLECT(o) AS others`;
+  ${allPredsQueryString}
+  OPTIONAL MATCH (${jSymbol})--(o)
+  RETURN ${jSymbol}, COLLECT(o) AS others${groupByEntries.length > 0 ? ', ' + groupByEntries.map(e => e.returnExpr).join(', ') : ''}`;
   }
   
   // ========== FEATURE: Aggregations with Conditions ==========
@@ -663,14 +713,15 @@ RETURN ${jSymbol}, COLLECT(o) AS others`;
   if (hasAggConditions) {
       const withClauseAggs = aggregationEntries.map((a, idx) => {
           const alias = a.alias || `agg_${idx}`; 
-          a.finalAlias = alias; 
-          return `${a.expr} AS ${alias}`;
+          a.finalAlias = formatCypherIdentifier(alias); 
+          return `${a.expr} AS ${a.finalAlias}`;
       });
       
-      const withClauseVars = [
-          ...simpleReturnVars,
-          ...withClauseAggs
-      ];
+          const withClauseVars = [
+            ...simpleReturnVars,
+            ...groupByEntries.map(e => e.withExpr),
+            ...withClauseAggs
+          ];
       
       const whereClauses = aggregationEntries
           .filter(a => a.hasCondition && a.condition)
@@ -679,10 +730,11 @@ RETURN ${jSymbol}, COLLECT(o) AS others`;
       const whereStr = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
       
       // Order return variables: simple vars first, then aggregations, then path variables
-      const finalReturnVars = [
+        const finalReturnVars = [
           ...simpleReturnVars,
-          ...aggregationEntries.map(a => a.finalAlias ? a.finalAlias : (a.alias ? a.alias : a.expr))
-      ];
+          ...groupByEntries.map(e => e.returnExpr),
+          ...aggregationEntries.map(a => a.finalAlias ? a.finalAlias : (a.alias ? formatCypherIdentifier(a.alias) : a.expr))
+        ];
 
       return [
         `MATCH ${loneQueryString}${allRsQueriesString}`,
@@ -695,14 +747,15 @@ RETURN ${jSymbol}, COLLECT(o) AS others`;
   } else if (aggregationEntries.length > 0) {
       // ========== FEATURE: Simple Aggregations (No Conditions) ==========
       // Standard return with aggregations
-      const finalReturnVars = [
-          ...simpleReturnVars, 
-          ...aggregationEntries.map(a => {
-              if (a.alias) return `${a.expr} AS ${a.alias}`;
-              if (a.isLegacy) return a.expr;
-              return `${a.expr} AS agg_${state.nodes.find(n => n.id === a.nodeId)?.id}`;
+          const finalReturnVars = [
+            ...simpleReturnVars,
+            ...groupByEntries.map(e => e.returnExpr),
+            ...aggregationEntries.map(a => {
+            if (a.alias) return `${a.expr} AS ${formatCypherIdentifier(a.alias)}`;
+            if (a.isLegacy) return a.expr;
+            return `${a.expr} AS ${formatCypherIdentifier(`agg_${state.nodes.find(n => n.id === a.nodeId)?.id}`)}`;
           })
-      ];
+        ];
       
       return [
         `MATCH ${loneQueryString}${allRsQueriesString}`,
@@ -715,7 +768,7 @@ RETURN ${jSymbol}, COLLECT(o) AS others`;
       return [
         `MATCH ${loneQueryString}${allRsQueriesString}`,
         allPredsQueryString,
-        `RETURN ${simpleReturnVars.join(', ')}`
+        `RETURN ${[...simpleReturnVars, ...groupByEntries.map(e => e.returnExpr)].join(', ')}`
       ].filter(val => val && val.trim() !== '').join('\n');
   }
 

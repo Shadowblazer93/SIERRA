@@ -228,7 +228,7 @@ function Node(props) {
 
       const centerX = displayRadius + ringRadius * Math.cos(angle);
       const centerY = displayRadius + ringRadius * Math.sin(angle);
-      const seed = `${props.id}|${index}|${agg.function || ''}|${agg.attribute || ''}|${agg.alias || ''}|${agg.operator || ''}|${agg.value || ''}`;
+      const seed = `${props.id}|${index}|${agg.function || ''}|${agg.attribute || ''}|${agg.operator || ''}|${agg.value || ''}`;
       const color = buildRandomAggregationColor(seed);
 
       return {
@@ -261,7 +261,7 @@ function Node(props) {
       const centerX = displayRadius + displayRadius * Math.cos(angle);
       const centerY = displayRadius + displayRadius * Math.sin(angle);
 
-      const seed = `${props.id}|${aggIndex}|${agg.function || ''}|${agg.attribute || ''}|${agg.alias || ''}|${agg.operator || ''}|${agg.value || ''}`;
+      const seed = `${props.id}|${aggIndex}|${agg.function || ''}|${agg.attribute || ''}|${agg.operator || ''}|${agg.value || ''}`;
       const color = buildRandomAggregationColor(seed);
 
       return {

@@ -2,6 +2,27 @@ import React, { useRef, useEffect } from 'react';
 import * as Constants from '../constants';
 const neo4j = require('neo4j-driver');
 
+const normalizeNeo4jValue = (value) => {
+  if (neo4j.isInt(value)) {
+    return neo4j.integer.inSafeRange(value)
+      ? neo4j.integer.toNumber(value)
+      : neo4j.integer.toString(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeNeo4jValue(item));
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.keys(value).reduce((acc, key) => {
+      acc[key] = normalizeNeo4jValue(value[key]);
+      return acc;
+    }, {});
+  }
+
+  return value;
+};
+
 function SearchResults(props) {
   const getColumnColor = (index) => {
     if (!props.result || props.result.length === 0) return '#fff';
@@ -84,16 +105,14 @@ function SearchResults(props) {
                           return (
                             <div key={i} style={{ textAlign: 'left' }}>
                               <b>{key}:</b>{' '}
-                              {neo4j.isInt(val.properties[key])
-                                ? neo4j.integer.toString(val.properties[key])
-                                : JSON.stringify(val.properties[key])}
+                              {JSON.stringify(normalizeNeo4jValue(val.properties[key]))}
                             </div>
                           );
                         });
                       } else if (val && val.segments) {
                          content = <div>Path (length: {val.length})</div>;
-                      } else {
-                         content = JSON.stringify(val);
+                       } else {
+                         content = JSON.stringify(normalizeNeo4jValue(val));
                       }
                       return (
                       // set colour of column to respective colour of node in constructed query graph

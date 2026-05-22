@@ -6,6 +6,7 @@ import {
   MinusOutlined,
   HomeOutlined,
   FilterOutlined,
+  EditOutlined,
   LeftOutlined,
   RightOutlined,
   DragOutlined,
@@ -937,6 +938,18 @@ const NodePredicateModal = ({
   const expressionTreeContainerRef = useRef(null);
   const [state, dispatch] = useContext(Context);
 
+  const currentNode = (state.nodes || []).find((n) => String(n.id) === String(nodeId));
+  const rawGroupBy = (currentNode && currentNode.data && Array.isArray(currentNode.data.groupBy)) ? currentNode.data.groupBy : [];
+  // normalize to array of { attr, alias }
+  const currentGroupBy = rawGroupBy.map(item => {
+    if (!item) return null;
+    if (typeof item === 'string') return { attr: item, alias: '' };
+    if (typeof item === 'object') return { attr: item.attr, alias: item.alias || '' };
+    return null;
+  }).filter(Boolean);
+  const selectedGroupByAttrs = currentGroupBy.map(g => g.attr);
+  const hasPipelineAgg = Array.isArray(aggregations) && aggregations.some(a => a && a.hasCondition);
+
   const predicateKeys = Object.keys(predicates || {});
   const predicateKeySignature = predicateKeys.slice().sort().join('|');
 
@@ -1639,6 +1652,19 @@ const NodePredicateModal = ({
                            <Select.Option value="MAX">MAX</Select.Option>
                            <Select.Option value="COLLECT">COLLECT</Select.Option>
                        </Select>
+                         <Button
+                           icon={<EditOutlined />}
+                           type={(agg.showAlias || (agg.alias && agg.alias.trim() !== '')) ? 'primary' : 'default'}
+                           onClick={() => {
+                             const newAggs = [...(Array.isArray(aggregations) ? aggregations : [])];
+                             const showAlias = !agg.showAlias && !(agg.alias && agg.alias.trim() !== '');
+                             newAggs[idx] = { ...agg, showAlias };
+                             dispatch({
+                               type: 'MODIFY_NODE_DATA',
+                               payload: { node: nodeId, prop: 'aggregations', newVal: newAggs },
+                             });
+                           }}
+                         />
                        <Button 
                            icon={<FilterOutlined />}
                            type={agg.hasCondition ? 'primary' : 'default'}
@@ -1706,6 +1732,22 @@ const NodePredicateModal = ({
                        </div>
                    )}
 
+                         {!agg.hasCondition && (agg.showAlias || (agg.alias && agg.alias.trim() !== '')) && (
+                           <div style={{display: 'flex', gap: 8, marginTop: 8, paddingLeft: 12, alignItems: 'center'}}>
+                             <EditOutlined style={{color: '#aaa'}}/>
+                             <Input
+                               placeholder="Alias"
+                               value={agg.alias}
+                               onChange={(e) => {
+                                 const newAggs = [...aggregations];
+                                 newAggs[idx] = { ...agg, alias: e.target.value };
+                                 dispatch({ type: 'MODIFY_NODE_DATA', payload: { node: nodeId, prop: 'aggregations', newVal: newAggs } });
+                               }}
+                               style={{flex: 1}}
+                             />
+                           </div>
+                         )}
+
                       {agg.attribute && ['SUM', 'AVG'].includes(agg.function) && !isNumeric(agg.attribute) && (
                           <div style={{color: 'red', fontSize: '12px', marginTop: 4}}>
                               Warning: Numeric aggregation on non-numeric type!
@@ -1729,6 +1771,55 @@ const NodePredicateModal = ({
            >
                Add Aggregation
            </Button>
+           <div style={{marginTop: 12}}>
+             <div style={{fontSize: 12, fontWeight: 700, marginBottom: 6}}>Group By</div>
+             <Select
+               mode="multiple"
+               placeholder="Select properties to GROUP BY"
+               style={{ width: '100%' }}
+               value={selectedGroupByAttrs}
+               onChange={(vals) => {
+                 // vals is array of attr strings. Merge with existing aliases where possible.
+                 const next = (vals || []).map(v => {
+                   const existing = currentGroupBy.find(g => g.attr === v);
+                   return { attr: v, alias: existing ? existing.alias : '' };
+                 });
+                 dispatch({
+                   type: 'MODIFY_NODE_DATA',
+                   payload: { node: nodeId, prop: 'groupBy', newVal: next },
+                 });
+               }}
+             >
+               {attributes.map(a => <Select.Option key={a} value={a}>{a}</Select.Option>)}
+             </Select>
+             {hasPipelineAgg && selectedGroupByAttrs.length === 0 && (
+               <div style={{ color: 'red', marginTop: 6, fontSize: 12 }}>At least one GROUP BY property is required when pipeline aggregations are used.</div>
+             )}
+             {/* Render alias inputs for selected group-by attributes */}
+             {selectedGroupByAttrs.length > 0 && (
+               <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                 {selectedGroupByAttrs.map((attr) => {
+                   const entry = currentGroupBy.find(g => g.attr === attr) || { attr, alias: '' };
+                   const emptyAlias = hasPipelineAgg && (!entry.alias || entry.alias.trim() === '');
+                   return (
+                     <div key={`gb-${attr}`} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                       <div style={{ minWidth: 120, fontWeight: 600 }}>{attr}</div>
+                       <Input
+                         placeholder={hasPipelineAgg ? 'Required alias' : 'Alias (optional)'}
+                         value={entry.alias}
+                         onChange={(e) => {
+                           const next = currentGroupBy.map(g => (g.attr === attr ? { ...g, alias: e.target.value } : g));
+                           dispatch({ type: 'MODIFY_NODE_DATA', payload: { node: nodeId, prop: 'groupBy', newVal: next } });
+                         }}
+                         style={emptyAlias ? { borderColor: 'red' } : {}}
+                       />
+                       {emptyAlias && <div style={{ color: 'red', fontSize: 12 }}>Alias required</div>}
+                     </div>
+                   );
+                 })}
+               </div>
+             )}
+           </div>
         </div>
 
         {/* <Divider orientation="left">Join : Optional Match</Divider>

@@ -26,6 +26,7 @@ const QueryControls = forwardRef(({
   const [skip, setSkip] = useState(options.skip || '');
   const [distinct, setDistinct] = useState(options.distinct || false);
   const [returnClause, setReturnClause] = useState(options.returnClause || '');
+  const [returnItems, setReturnItems] = useState([]);
   const containerRef = useRef(null);
   
   // Dragging State
@@ -41,6 +42,24 @@ const QueryControls = forwardRef(({
     openQueryControls: () => setVisible(true),
     openSettings: () => setSettingsVisible(true)
   }), []);
+
+  // Parse return clause string into individual items
+  const parseReturnClause = (clause) => {
+    if (!clause || typeof clause !== 'string') return [];
+    return clause
+      .split(',')
+      .map(item => item.trim())
+      .filter(item => item.length > 0)
+      .map((item, idx) => ({ 
+        field: item, 
+        id: Math.random().toString(36).substr(2, 9) 
+      }));
+  };
+
+  // Convert return items back to clause string
+  const itemsToReturnClause = (items) => {
+    return items.map(item => item.field).join(', ');
+  };
 
   useEffect(() => {
     if (onVisibleChange) {
@@ -58,6 +77,10 @@ const QueryControls = forwardRef(({
     setSkip(options.skip || '');
     setDistinct(options.distinct || false);
     setReturnClause(options.returnClause || '');
+    
+    // Parse return clause into items
+    const items = parseReturnClause(options.returnClause || '');
+    setReturnItems(items);
     
     // Ensure clauses have IDs for React keys to work properly during deletion
     const withs = (options.withClauses || []).map(w => ({ ...w, id: w.id || Math.random().toString(36).substr(2, 9) }));
@@ -116,7 +139,7 @@ const QueryControls = forwardRef(({
       x: Math.min(current.x, maxX),
       y: Math.min(current.y, maxY)
     }));
-  }, [visible, limit, skip, distinct, returnClause, withClauses, orderBys]);
+  }, [visible, limit, skip, distinct, returnItems, withClauses, orderBys]);
 
   const handleMouseDown = (e) => {
     // Only drag if clicking the header area (we'll implement this in render)
@@ -134,7 +157,7 @@ const QueryControls = forwardRef(({
         distinct,
         withClauses,
         orderBys,
-        returnClause
+        returnClause: itemsToReturnClause(returnItems)
     });
   };
 
@@ -151,7 +174,7 @@ const QueryControls = forwardRef(({
       orderBys: (opts && opts.orderBys || []).map(o => ({ field: o.field || '', direction: o.direction || 'ASC' }))
     });
 
-    const local = normalize({ limit, skip, distinct, returnClause, withClauses, orderBys });
+    const local = normalize({ limit, skip, distinct, returnClause: itemsToReturnClause(returnItems), withClauses, orderBys });
     const incoming = normalize(options || {});
 
     try {
@@ -159,7 +182,7 @@ const QueryControls = forwardRef(({
     } catch (e) {
       setDirty(true);
     }
-  }, [limit, skip, distinct, returnClause, withClauses, orderBys, options]);
+  }, [limit, skip, distinct, returnItems, withClauses, orderBys, options]);
 
   // WITH Handlers
   const addWithClause = () => {
@@ -189,6 +212,21 @@ const QueryControls = forwardRef(({
     const newOrders = [...orderBys];
     newOrders[index][field] = value;
     setOrderBys(newOrders);
+  };
+
+  // RETURN Handlers
+  const addReturnItem = () => {
+    setReturnItems([...returnItems, { field: '', id: Math.random().toString(36).substr(2, 9) }]);
+  };
+  const removeReturnItem = (index) => {
+    const newItems = [...returnItems];
+    newItems.splice(index, 1);
+    setReturnItems(newItems);
+  };
+  const updateReturnItem = (index, value) => {
+    const newItems = [...returnItems];
+    newItems[index].field = value;
+    setReturnItems(newItems);
   };
 
   if (!visible) {
@@ -396,16 +434,50 @@ const QueryControls = forwardRef(({
       
       <Space direction="vertical" size="small" style={{ width: '100%' }}>
         
-        <Row gutter={8} align="middle">
-             <Col span={8}><Text>RETURN</Text></Col>
-             <Col span={16}>
-                <Input 
-                    placeholder="n, r" 
-                    value={returnClause} 
-                    onChange={e => setReturnClause(e.target.value)} 
-                    size="small"
-                />
+        <Row gutter={8} align="middle" justify="space-between">
+             <Col><Text strong>RETURN</Text></Col>
+             <Col>
+                <Button size="small" type="dashed" onClick={addReturnItem} icon={<PlusOutlined />} />
              </Col>
+        </Row>
+
+        {returnItems.map((item, idx) => (
+            <Row key={item.id || idx} gutter={4} style={{ marginBottom: 4 }} align="middle">
+                <Col span={20}>
+                    <Input 
+                        placeholder="e.g., n, r, count(n)" 
+                        value={item.field}
+                        onChange={e => updateReturnItem(idx, e.target.value)}
+                        size="small" 
+                    />
+                </Col>
+                <Col span={4}>
+                    <Button 
+                        size="small" 
+                        danger 
+                        icon={<DeleteOutlined />} 
+                        onClick={() => removeReturnItem(idx)} 
+                    />
+                </Col>
+            </Row>
+        ))}
+
+        <Row gutter={8} align="middle" style={{ marginTop: 4 }}>
+          <Col span={24}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Direct edit:
+            </Text>
+            <Input 
+                placeholder="n, r" 
+                value={itemsToReturnClause(returnItems)} 
+                onChange={e => {
+                  setReturnClause(e.target.value);
+                  setReturnItems(parseReturnClause(e.target.value));
+                }}
+                size="small"
+                style={{ marginTop: 4 }}
+            />
+          </Col>
         </Row>
 
         <Row gutter={8} align="middle" style={{ marginTop: 4 }}>

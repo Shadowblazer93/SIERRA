@@ -469,8 +469,25 @@ function App() {
       if (queryOptions.returnClause) {
         const lastReturnIndex = query.lastIndexOf('RETURN');
         if (lastReturnIndex !== -1) {
+            // Extract existing return clause from query
+            const afterReturn = query.substring(lastReturnIndex + 6).trimStart();
+            const existingReturnMatch = afterReturn.match(/^(DISTINCT\s+)?(.*?)(?:\nWITH|\nORDER\s+BY|\nSKIP|\nLIMIT|$)/i);
+            let existingReturn = '';
+            let hasDistinct = false;
+            
+            if (existingReturnMatch) {
+              hasDistinct = !!existingReturnMatch[1];
+              existingReturn = existingReturnMatch[2].trim();
+            }
+            
+            // Append custom returns to existing
+            const combinedReturn = existingReturn && queryOptions.returnClause 
+              ? `${existingReturn}, ${queryOptions.returnClause}`
+              : queryOptions.returnClause || existingReturn;
+            
             const pre = query.substring(0, lastReturnIndex);
-            query = pre + `RETURN ${queryOptions.returnClause}`;
+            const distinctKeyword = hasDistinct || queryOptions.distinct ? 'DISTINCT ' : '';
+            query = pre + `RETURN ${distinctKeyword}${combinedReturn}`;
         } else {
             query += `\nRETURN ${queryOptions.returnClause}`;
         }
@@ -932,8 +949,16 @@ function App() {
       }))
     : [];
 
+  const loadingThemePreset = DARKREADER_PRESETS[darkThemePreset] || DARKREADER_PRESETS.materialdark;
+  const loadingBackgroundColor = darkModeEnabled
+    ? (loadingThemePreset && loadingThemePreset.darkSchemeBackgroundColor)
+    : null;
+
   const loadingOverlay = (
-    <div className={`loading-screen ${pageStatus === 'READY' ? 'fade-out' : ''}`}>
+    <div
+      className={`loading-screen ${pageStatus === 'READY' ? 'fade-out' : ''}`}
+      style={loadingBackgroundColor ? { backgroundColor: loadingBackgroundColor } : undefined}
+    >
       <div className="spinner-layer" aria-hidden>
         <LoadingOutlined className="spin spin-1" />
         <LoadingOutlined className="spin spin-2" />

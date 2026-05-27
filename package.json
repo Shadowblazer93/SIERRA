@@ -1,6 +1,6 @@
 {
   "name": "sierra",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "homepage": ".",
   "private": false,
   "browserslist": {
@@ -51,6 +51,7 @@
   "dependencies": {
     "@codemirror/legacy-modes": "^0.19.0",
     "@codemirror/stream-parser": "^0.19.5",
+    "@supabase/supabase-js": "^2.106.1",
     "@uiw/react-codemirror": "4.6.0",
     "antd": "^4.18.5",
     "bootstrap": "^4.6.0",

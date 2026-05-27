@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import { Button, Input, Switch, Select, Space, Typography, Divider, Row, Col, Modal } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined, RetweetOutlined, PlusOutlined, DeleteOutlined, DragOutlined, EyeInvisibleOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { Button, Form, Input, Switch, Select, Space, Typography, Divider, Row, Col, Modal, message } from 'antd';
+import { ArrowUpOutlined, ArrowDownOutlined, RetweetOutlined, PlusOutlined, DeleteOutlined, DragOutlined, EyeInvisibleOutlined, InfoCircleOutlined, UserOutlined } from '@ant-design/icons';
+import { supabase } from '../../supabaseClient';
 import './index.css';
 
 const { Text } = Typography;
@@ -36,6 +37,10 @@ const QueryControls = forwardRef(({
   const [visible, setVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [legendVisible, setLegendVisible] = useState(false);
+  const [changePasswordVisible, setChangePasswordVisible] = useState(false);
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
+  const [changePasswordForm] = Form.useForm();
+  const [accountLabel, setAccountLabel] = useState('');
 
   useImperativeHandle(ref, () => ({
     toggleQueryControls: () => setVisible((prev) => !prev),
@@ -66,6 +71,38 @@ const QueryControls = forwardRef(({
       onVisibleChange(visible);
     }
   }, [visible, onVisibleChange]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadAccountLabel = async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        const user = data?.user;
+        if (!isMounted) return;
+        const fullName = user?.user_metadata?.full_name;
+        const email = user?.email;
+        setAccountLabel(fullName || email || '');
+      } catch (error) {
+        if (!isMounted) return;
+        setAccountLabel('');
+      }
+    };
+
+    loadAccountLabel();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const user = session?.user;
+      const fullName = user?.user_metadata?.full_name;
+      const email = user?.email;
+      setAccountLabel(fullName || email || '');
+    });
+
+    return () => {
+      isMounted = false;
+      authListener?.subscription?.unsubscribe();
+    };
+  }, []);
 
   // Array management for WITH and ORDER BY
   const [withClauses, setWithClauses] = useState(options.withClauses || []);
@@ -159,6 +196,35 @@ const QueryControls = forwardRef(({
         orderBys,
         returnClause: itemsToReturnClause(returnItems)
     });
+  };
+
+  const handleChangePassword = async (values) => {
+    try {
+      setChangePasswordLoading(true);
+      const { error } = await supabase.auth.updateUser({ password: values.password });
+      if (error) {
+        message.error(error.message || 'Failed to update password');
+        return;
+      }
+      message.success('Password updated successfully.');
+      changePasswordForm.resetFields();
+      setChangePasswordVisible(false);
+    } catch (error) {
+      message.error('An error occurred while updating your password');
+      console.error('Update password error:', error);
+    } finally {
+      setChangePasswordLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      window.location.href = '/auth';
+    } catch (error) {
+      message.error('Failed to log out');
+      console.error('Logout error:', error);
+    }
   };
 
   // Track whether local controls differ from incoming `options` (unsaved changes)
@@ -330,7 +396,77 @@ const QueryControls = forwardRef(({
                     <Option value="concentric-circles">Concentric circles</Option>
                   </Select>
                 </div>
+                <Divider style={{ margin: '4px 0' }} />
+                <Text strong style={{fontSize:18, color:'#606060'}}>Account</Text>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <UserOutlined style={{ color: '#6b7280' }} />
+                  <Text>
+                    Logged in as {accountLabel || 'your account'}
+                  </Text>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <Text strong>Change Password</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Update your account password.
+                    </Text>
+                  </div>
+                  <Button type="default" size="small" onClick={() => setChangePasswordVisible(true)}>
+                    Change
+                  </Button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <Text strong>Log Out</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Sign out of SIERRA.
+                    </Text>
+                  </div>
+                  <Button danger size="small" onClick={handleLogout}>
+                    Log out
+                  </Button>
+                </div>
               </div>
+            </Modal>
+            <Modal
+              title="Change Password"
+              visible={changePasswordVisible}
+              onCancel={() => {
+                setChangePasswordVisible(false);
+                changePasswordForm.resetFields();
+              }}
+              footer={null}
+            >
+              <Form form={changePasswordForm} layout="vertical" onFinish={handleChangePassword}>
+                <Form.Item
+                  label="New password"
+                  name="password"
+                  rules={[{ required: true, message: 'Please enter a new password' }]}
+                >
+                  <Input.Password placeholder="Enter a new password" />
+                </Form.Item>
+                <Form.Item
+                  label="Confirm password"
+                  name="confirm"
+                  dependencies={['password']}
+                  rules={[
+                    { required: true, message: 'Please confirm your new password' },
+                    ({ getFieldValue }) => ({
+                      validator(_, value) {
+                        if (!value || value === getFieldValue('password')) {
+                          return Promise.resolve();
+                        }
+                        return Promise.reject(new Error('Passwords do not match'));
+                      }
+                    })
+                  ]}
+                >
+                  <Input.Password placeholder="Confirm your new password" />
+                </Form.Item>
+                <Button type="primary" htmlType="submit" loading={changePasswordLoading} block>
+                  Update password
+                </Button>
+              </Form>
             </Modal>
             <Modal
               title="Graph Legend"

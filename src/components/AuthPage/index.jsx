@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import ReactFlow, { ReactFlowProvider } from 'react-flow-renderer';
-import { AutoComplete, Button, Form, Input, Typography } from 'antd';
+import { AutoComplete, Button, Form, Input, Typography, message, Modal } from 'antd';
 import { Context, initialState } from '../../Store';
 import Reducer from '../../Reducer';
+import { supabase } from '../../supabaseClient';
 import Node from '../Node';
 import CustomEdge from '../CustomEdge';
 import PredicateLinkEdge from '../PredicateLinkEdge';
@@ -128,11 +129,113 @@ function AuthPage() {
     showcase,
     buildShowcaseState
   );
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [registerLoading, setRegisterLoading] = useState(false);
+  const [resetPasswordVisible, setResetPasswordVisible] = useState(false);
+  const [resetPasswordEmail, setResetPasswordEmail] = useState('');
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+  const [resetPasswordForm] = Form.useForm();
+  const [isExiting, setIsExiting] = useState(false);
 
   const fitShowcase = () => {
     const instance = reactFlowRef.current;
     if (!instance || typeof instance.fitView !== 'function') return;
     instance.fitView({ padding: 0.18, includeHiddenNodes: false, duration: 0 });
+  };
+
+  const handleLogin = async (values) => {
+    try {
+      setLoginLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: values.email,
+        password: values.password
+      });
+
+      if (error) {
+        message.error(error.message || 'Failed to sign in');
+        return;
+      }
+
+      message.success('Successfully signed in!');
+      setIsExiting(true);
+      window.setTimeout(() => {
+        window.location.href = '/';
+      }, 600);
+    } catch (error) {
+      message.error('An error occurred during sign in');
+      console.error('Login error:', error);
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleRegister = async (values) => {
+    try {
+      setRegisterLoading(true);
+
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          data: {
+            full_name: values.name,
+            institution: values.institution
+          }
+        }
+      });
+
+      if (authError) {
+        message.error(authError.message || 'Failed to create account');
+        return;
+      }
+
+      if (!authData.user) {
+        message.error('Registration failed. Please try again.');
+        return;
+      }
+
+      message.success('Account created successfully!.');
+      registerForm.resetFields();
+      setInstitutionValue('');
+
+      // Switch to login tab after a brief delay so the user sees the success message
+      setTimeout(() => {
+        setActiveTab('login');
+        // Show info message in login tab
+        setTimeout(() => {
+          message.info('Please log in with your new account.');
+        }, 300);
+      }, 1500);
+    } catch (error) {
+      message.error('An error occurred during registration');
+      console.error('Registration error:', error);
+    } finally {
+      setRegisterLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    try {
+      setResetPasswordLoading(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(resetPasswordEmail, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      });
+
+      if (error) {
+        message.error(error.message || 'Failed to send reset email');
+        return;
+      }
+
+      message.success('Password reset email sent! Check your inbox.');
+      resetPasswordForm.resetFields();
+      setResetPasswordEmail('');
+      setResetPasswordVisible(false);
+    } catch (error) {
+      message.error('An error occurred while resetting your password');
+      console.error('Password reset error:', error);
+    } finally {
+      setResetPasswordLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -309,7 +412,7 @@ function AuthPage() {
   );
 
   return (
-    <div className="auth-page">
+    <div className={`auth-page${isExiting ? ' auth-page--exit' : ''}`}>
       <div className="auth-graph-pane">
         <div className="auth-graph-title">SIERRA</div>
         <div className="auth-showcase-canvas" ref={showcaseCanvasRef}>
@@ -373,41 +476,82 @@ function AuthPage() {
           </div>
 
           {activeTab === 'login' ? (
-            <Form layout="vertical" className="auth-form" form={registerForm}>
-              <Form.Item label="Email" name="email">
+            <Form layout="vertical" className="auth-form" form={registerForm} onFinish={handleLogin}>
+              <Form.Item
+                label="Email"
+                name="email"
+                rules={[
+                  { required: true, message: 'Please enter your email' },
+                  { type: 'email', message: 'Please enter a valid email address' }
+                ]}
+              >
                 <Input placeholder="name@domain.com" />
               </Form.Item>
-              <Form.Item label="Password" name="password">
+              <Form.Item
+                label="Password"
+                name="password"
+                rules={[{ required: true, message: 'Please enter your password' }]}
+              >
                 <Input.Password placeholder="Enter your password" />
               </Form.Item>
               <Button
                 className="auth-action-button"
                 htmlType="submit"
+                loading={loginLoading}
               >
                 Sign in
               </Button>
               <div className="auth-helper-row">
                 <Text>Need help?</Text>
-                <Button type="link" className="auth-link-button">
+                <Button
+                  type="link"
+                  className="auth-link-button"
+                  onClick={() => setResetPasswordVisible(true)}
+                >
                   Reset password
                 </Button>
               </div>
             </Form>
           ) : (
-            <Form layout="vertical" className="auth-form">
-              <Form.Item label="Full name" name="name">
+            <Form layout="vertical" className="auth-form" form={registerForm} onFinish={handleRegister}>
+              <Form.Item
+                label="Full name"
+                name="name"
+                rules={[{ required: true, message: 'Please enter your full name' }]}
+              >
                 <Input placeholder="Ada Lovelace" />
               </Form.Item>
-              <Form.Item label="Email" name="email">
+              <Form.Item
+                label="Email"
+                name="email"
+                rules={[
+                  { required: true, message: 'Please enter your email address' },
+                  { type: 'email', message: 'Please enter a valid email address' }
+                ]}
+              >
                 <Input placeholder="you@domain.com" />
               </Form.Item>
-              <Form.Item label="Institution" name="institution">
+              <Form.Item
+                label="Institution"
+                name="institution"
+                rules={[{ required: true, message: 'Please enter your institution' }]}
+              >
                 <AutoComplete
                   options={institutionOptions}
                   value={institutionValue}
-                  onChange={(value) => setInstitutionValue(value)}
+                  onChange={(value) => {
+                    setInstitutionValue(value);
+                    registerForm.setFieldsValue({
+                      institution: value,
+                      institutionCanonical: value
+                    });
+                  }}
                   onSearch={(value) => {
                     setInstitutionValue(value);
+                    registerForm.setFieldsValue({
+                      institution: value,
+                      institutionCanonical: value
+                    });
 
                     if (institutionSearchRef.current.timeoutId) {
                       window.clearTimeout(institutionSearchRef.current.timeoutId);
@@ -460,10 +604,18 @@ function AuthPage() {
                   />
                 </AutoComplete>
               </Form.Item>
-              <Form.Item name="institutionCanonical" hidden>
+              <Form.Item
+                name="institutionCanonical"
+                hidden
+                rules={[{ required: true }]}
+              >
                 <Input />
               </Form.Item>
-              <Form.Item label="Password" name="password">
+              <Form.Item
+                label="Password"
+                name="password"
+                rules={[{ required: true, message: 'Please create a password' }]}
+              >
                 <Input.Password
                   placeholder="Create a password"
                   onChange={(event) => {
@@ -487,7 +639,22 @@ function AuthPage() {
                 </div>
                 <span className="auth-password-label">{passwordStrength.label}</span>
               </div>
-              <Form.Item label="Confirm password" name="confirm">
+              <Form.Item
+                label="Confirm password"
+                name="confirm"
+                dependencies={["password"]}
+                rules={[
+                  { required: true, message: 'Please confirm your password' },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (!value || value === getFieldValue('password')) {
+                        return Promise.resolve();
+                      }
+                      return Promise.reject(new Error('Passwords do not match'));
+                    }
+                  })
+                ]}
+              >
                 <Input.Password
                   placeholder="Confirm your password"
                   onChange={(event) => {
@@ -516,7 +683,7 @@ function AuthPage() {
                     : 'Passwords do not match'}
                 </div>
               )}
-              <Button className="auth-action-button" htmlType="submit">
+              <Button className="auth-action-button" htmlType="submit" loading={registerLoading}>
                 Create account
               </Button>
               <div className="auth-helper-row">
@@ -529,6 +696,58 @@ function AuthPage() {
           )}
         </div>
       </div>
+
+      <Modal
+        title="Reset Password"
+        visible={resetPasswordVisible}
+        onCancel={() => {
+          setResetPasswordVisible(false);
+          resetPasswordForm.resetFields();
+          setResetPasswordEmail('');
+        }}
+        footer={[
+          <Button
+            key="cancel"
+            onClick={() => {
+              setResetPasswordVisible(false);
+              resetPasswordForm.resetFields();
+              setResetPasswordEmail('');
+            }}
+          >
+            Cancel
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            loading={resetPasswordLoading}
+            onClick={handlePasswordReset}
+            disabled={!resetPasswordEmail}
+          >
+            Send Reset Email
+          </Button>,
+        ]}
+      >
+        <Form form={resetPasswordForm} layout="vertical">
+          <Form.Item
+            label="Email address"
+            name="resetEmail"
+            rules={[
+              { required: true, message: 'Please enter your email address' },
+              { type: 'email', message: 'Please enter a valid email address' }
+            ]}
+          >
+            <Input
+              placeholder="Enter your email"
+              type="email"
+              value={resetPasswordEmail}
+              onChange={(event) => setResetPasswordEmail(event.target.value)}
+            />
+          </Form.Item>
+          <Text type="secondary">
+            We'll send you an email with a link to reset your password.
+          </Text>
+        </Form>
+      </Modal>
     </div>
   );
 }

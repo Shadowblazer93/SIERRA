@@ -2,6 +2,8 @@ import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
 import * as DarkReader from 'darkreader';
 import Node from './components/Node';
 import AuthPage from './components/AuthPage';
+import ResetPasswordPage from './components/ResetPasswordPage';
+import { supabase } from './supabaseClient';
 import ReactFlow, { Controls, isEdge, addEdge, removeElements, Background, useStoreState, ReactFlowProvider } from 'react-flow-renderer';
 import NewNodeDrawButton from './components/NewNodeDrawButton';
 import PredicateDisplayDropDown from './components/PredicateDisplayDropDown';
@@ -66,11 +68,60 @@ const loadQueryClipboard = () => {
 function App() {
   const VA = useVisualActions()
   const [state, dispatch] = useContext(Context);
-  const isAuthRoute = useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    return window.location.pathname.toLowerCase().includes('auth');
+  const authPath = useMemo(() => {
+    if (typeof window === 'undefined') return '';
+    return window.location.pathname.toLowerCase();
   }, []);
+  const isResetPasswordRoute = authPath.includes('/auth/reset-password');
+  const isAuthRoute = authPath.includes('/auth');
+  const [sessionReady, setSessionReady] = useState(false);
+  const [hasSession, setHasSession] = useState(false);
   const [pageStatus, setPageStatus] = useState('LOADING');
+    useEffect(() => {
+      let isMounted = true;
+
+      const initSession = async () => {
+        try {
+          const { data } = await supabase.auth.getSession();
+          if (!isMounted) return;
+          setHasSession(!!data?.session);
+        } catch (error) {
+          if (!isMounted) return;
+          setHasSession(false);
+        } finally {
+          if (!isMounted) return;
+          setSessionReady(true);
+        }
+      };
+
+      initSession();
+
+      const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+        setHasSession(!!session);
+        setSessionReady(true);
+      });
+
+      return () => {
+        isMounted = false;
+        authListener?.subscription?.unsubscribe();
+      };
+    }, []);
+
+    useEffect(() => {
+      if (!sessionReady) return;
+      if (isResetPasswordRoute) return undefined;
+      if (!hasSession && !isAuthRoute) {
+        window.location.href = '/auth';
+        return undefined;
+      }
+      if (hasSession && isAuthRoute) {
+        const redirectTimeout = window.setTimeout(() => {
+          window.location.href = '/';
+        }, 600);
+        return () => window.clearTimeout(redirectTimeout);
+      }
+      return undefined;
+    }, [sessionReady, hasSession, isAuthRoute, isResetPasswordRoute]);
   const [showResults, setShowResults] = useState(false);
   const [searchResult, setSearchResult] = useState([]);
   const [toastInfo, setToastInfo] = useState({ show: false, msg: '', confirm: function () {} });
@@ -984,6 +1035,10 @@ function App() {
       </div>
     </div>
   );
+
+  if (isResetPasswordRoute) {
+    return <ResetPasswordPage />;
+  }
 
   if (isAuthRoute) {
     return <AuthPage />;

@@ -159,7 +159,7 @@ function AuthPage() {
       message.success('Successfully signed in!');
       setIsExiting(true);
       window.setTimeout(() => {
-        window.location.href = '/';
+        window.location.hash = '#/';
       }, 600);
     } catch (error) {
       message.error('An error occurred during sign in');
@@ -218,7 +218,7 @@ function AuthPage() {
     try {
       setResetPasswordLoading(true);
       const { error } = await supabase.auth.resetPasswordForEmail(resetPasswordEmail, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: `${window.location.origin}/#/auth/reset-password`,
       });
 
       if (error) {

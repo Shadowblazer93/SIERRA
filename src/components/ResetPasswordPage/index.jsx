@@ -14,10 +14,31 @@ function ResetPasswordPage() {
   useEffect(() => {
     let isMounted = true;
 
+    const parseRecoveryTokens = () => {
+      if (typeof window === 'undefined') return null;
+      const rawHash = window.location.hash || '';
+      const parts = rawHash.split('#');
+      if (parts.length < 3) return null;
+
+      const tokenFragment = parts[parts.length - 1];
+      if (!tokenFragment || !tokenFragment.includes('access_token=')) return null;
+
+      const params = new URLSearchParams(tokenFragment);
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+
+      if (!accessToken || !refreshToken) return null;
+      return { accessToken, refreshToken };
+    };
+
     const initRecovery = async () => {
       try {
-        if (typeof supabase.auth.getSessionFromUrl === 'function') {
-          const { error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
+        const tokens = parseRecoveryTokens();
+        if (tokens) {
+          const { error } = await supabase.auth.setSession({
+            access_token: tokens.accessToken,
+            refresh_token: tokens.refreshToken,
+          });
           if (error) {
             message.error(error.message || 'Unable to validate reset link');
           }
@@ -58,7 +79,7 @@ function ResetPasswordPage() {
       message.success('Password updated successfully. You can now log in.');
       form.resetFields();
       window.setTimeout(() => {
-        window.location.href = '/auth';
+        window.location.hash = '#/auth';
       }, 1500);
     } catch (error) {
       message.error('An error occurred while updating your password');
@@ -108,7 +129,7 @@ function ResetPasswordPage() {
         ) : (
           <div className="reset-password-error">
             <Text type="danger">This reset link is invalid or has expired.</Text>
-            <Button type="link" onClick={() => { window.location.href = '/auth'; }}>
+            <Button type="link" onClick={() => { window.location.hash = '#/auth'; }}>
               Back to login
             </Button>
           </div>

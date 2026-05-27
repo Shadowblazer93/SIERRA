@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import * as DarkReader from 'darkreader';
 import Node from './components/Node';
 import AuthPage from './components/AuthPage';
@@ -68,10 +69,18 @@ const loadQueryClipboard = () => {
 function App() {
   const VA = useVisualActions()
   const [state, dispatch] = useContext(Context);
+  const location = useLocation();
   const authPath = useMemo(() => {
-    if (typeof window === 'undefined') return '';
-    return window.location.pathname.toLowerCase();
-  }, []);
+    if (typeof window !== 'undefined') {
+      const hashPath = (window.location.hash || '').replace(/^#/, '');
+      if (hashPath) return hashPath.toLowerCase();
+
+      const pathname = window.location.pathname || '';
+      if (pathname && pathname !== '/') return pathname.toLowerCase();
+    }
+
+    return (location?.pathname || '').toLowerCase();
+  }, [location?.pathname, location?.hash]);
   const isResetPasswordRoute = authPath.includes('/auth/reset-password');
   const isAuthRoute = authPath.includes('/auth');
   const [sessionReady, setSessionReady] = useState(false);
@@ -107,16 +116,24 @@ function App() {
       };
     }, []);
 
+    const setHashPath = (nextPath) => {
+      if (typeof window === 'undefined') return;
+      const normalized = nextPath.startsWith('#') ? nextPath : `#${nextPath}`;
+      if (window.location.hash !== normalized) {
+        window.location.hash = normalized;
+      }
+    };
+
     useEffect(() => {
       if (!sessionReady) return;
       if (isResetPasswordRoute) return undefined;
       if (!hasSession && !isAuthRoute) {
-        window.location.href = '/auth';
+        setHashPath('/auth');
         return undefined;
       }
       if (hasSession && isAuthRoute) {
         const redirectTimeout = window.setTimeout(() => {
-          window.location.href = '/';
+          setHashPath('/');
         }, 600);
         return () => window.clearTimeout(redirectTimeout);
       }

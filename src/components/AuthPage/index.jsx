@@ -668,7 +668,7 @@ function AuthPage() {
                   }}
                 />
               </Form.Item>
-              {confirmPasswordStatus !== 'idle' && (
+              {confirmPasswordStatus === 'match' && (
                 <div
                   className={
                     confirmPasswordStatus === 'match'

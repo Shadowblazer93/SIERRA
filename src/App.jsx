@@ -19,8 +19,8 @@ import OrLinkEdge from './components/OrLinkEdge';
 import AndLinkEdge from './components/AndLinkEdge';
 import PredicateLinkModal from './components/PredicateLinkModal';
 import ConfirmationAlert from './components/ConfirmationAlert';
-import {Button, Spin, Select, Drawer, Modal, Form, Input, Row, Col, message} from 'antd';
-import {InfoCircleOutlined, BuildOutlined, CopyOutlined, LoadingOutlined, ApiOutlined, ArrowLeftOutlined, NodeIndexOutlined, EyeOutlined, EditOutlined, SettingOutlined, SnippetsOutlined} from '@ant-design/icons'
+import { Button, Spin, Select, Drawer, Modal, Form, Input, Row, Col, message, Tabs, Empty } from 'antd';
+import { InfoCircleOutlined, BuildOutlined, CopyOutlined, LoadingOutlined, ApiOutlined, ArrowLeftOutlined, NodeIndexOutlined, EyeOutlined, EditOutlined, SettingOutlined, SnippetsOutlined, DeleteOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import Title from 'antd/lib/typography/Title';
 import { getNodeId } from './utils/getNodeId';
 import useVisualActions from './hooks/useVisualActions'
@@ -37,7 +37,9 @@ const neo4jApi = require('./neo4jApi')
 const pkg = require('../package.json')
 
 const api = require('./neo4jApi');
+const { TabPane } = Tabs;
 const QUERY_CLIPBOARD_STORAGE_KEY = 'sierra-query-clipboard';
+const RECENT_DATABASES_STORAGE_KEY = 'sierra-recent-databases';
 const THEME_STORAGE_KEY = 'sierra-theme-mode';
 const THEME_PRESET_STORAGE_KEY = 'sierra-darkreader-theme';
 const DARKREADER_PRESETS = (darkreaderThemes || []).reduce((acc, theme) => {
@@ -59,6 +61,20 @@ const loadQueryClipboard = () => {
 
   try {
     const raw = window.localStorage.getItem(QUERY_CLIPBOARD_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+};
+
+const loadRecentDatabases = () => {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(RECENT_DATABASES_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch (error) {
@@ -140,6 +156,7 @@ function App() {
       return undefined;
     }, [sessionReady, hasSession, isAuthRoute, isResetPasswordRoute]);
   const [showResults, setShowResults] = useState(false);
+  const [isQueryRunning, setIsQueryRunning] = useState(false);
   const [searchResult, setSearchResult] = useState([]);
   const [toastInfo, setToastInfo] = useState({ show: false, msg: '', confirm: function () {} });
   const [joinModalVisible, setJoinModalVisible] = useState(false);
@@ -161,6 +178,7 @@ function App() {
   const dnfActivationTimer = useRef(null);
   const [queryClipboardVisible, setQueryClipboardVisible] = useState(false);
   const [queryClipboardHistory, setQueryClipboardHistory] = useState(() => loadQueryClipboard());
+  const [recentDatabases, setRecentDatabases] = useState(() => loadRecentDatabases());
   const suppressQuerySyncRef = useRef(false);
   const [queryControlsVisible, setQueryControlsVisible] = useState(false);
   const [showcaseModalVisible, setShowcaseModalVisible] = useState(false);
@@ -243,6 +261,26 @@ function App() {
   }, [queryClipboardHistory]);
 
   useEffect(() => {
+    try {
+      window.localStorage.setItem(RECENT_DATABASES_STORAGE_KEY, JSON.stringify(recentDatabases));
+    } catch (error) {
+      // Ignore storage failures so connections stay usable.
+    }
+  }, [recentDatabases]);
+
+  useEffect(() => {
+    if (connectModalVisible) {
+      setConnectTabKey('connect');
+    }
+  }, [connectModalVisible]);
+
+  useEffect(() => {
+    if (showResults) {
+      setIsQueryRunning(false);
+    }
+  }, [showResults]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return;
 
     try {
@@ -262,6 +300,9 @@ function App() {
   }, [darkModeEnabled, darkThemePreset, shouldEnableDarkMode]);
 
   const [connectModalVisible, setConnectModalVisible] = useState(false);
+  const [connectTabKey, setConnectTabKey] = useState('connect');
+  const [recentDetailsVisible, setRecentDetailsVisible] = useState(false);
+  const [activeRecent, setActiveRecent] = useState(null);
   const [form] = Form.useForm();
 
   const getOrGroupColor = (groupId) => {
@@ -338,11 +379,67 @@ function App() {
     }
   };
 
+  const normalizeDatabaseUri = (rawUri) => {
+    if (!rawUri) return rawUri;
+    if (!/^[a-z0-9+.-]+:\/\//i.test(rawUri)) {
+      return `bolt+s://${rawUri}`;
+    }
+    return rawUri;
+  };
+
+  const buildRecentKey = (entry) => `${entry.uri}|${entry.database}|${entry.username}`;
+
+  const upsertRecentDatabase = (entry) => {
+    setRecentDatabases((prev) => {
+      const key = buildRecentKey(entry);
+      const filtered = prev.filter((item) => buildRecentKey(item) !== key);
+      return [entry, ...filtered].slice(0, 25);
+    });
+  };
+
+  const createRecentEntry = (values, normalizedUri, existingId) => ({
+    id: existingId || `recent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    uri: normalizedUri,
+    database: values.database,
+    username: values.username,
+    password: values.password,
+    connectedAt: new Date().toISOString()
+  });
+
+  const connectToDatabase = (values, options = {}) => {
+    const normalizedUri = normalizeDatabaseUri(values.uri);
+    const recentEntry = createRecentEntry(values, normalizedUri, options.existingId);
+    setDatabaseSource({ ...values, uri: normalizedUri });
+    upsertRecentDatabase(recentEntry);
+    if (options.closeModal) {
+      setConnectModalVisible(false);
+    }
+    if (options.closeDetails) {
+      setRecentDetailsVisible(false);
+      setActiveRecent(null);
+    }
+  };
+
+  const handleRecentRowClick = (entry) => {
+    setActiveRecent(entry);
+    setRecentDetailsVisible(true);
+  };
+
+  const handleRecentDelete = (id) => {
+    setRecentDatabases((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleClearRecent = () => {
+    setRecentDatabases([]);
+  };
+
   //* only for user study
   // const [userStudyDataset, setUserStudyDataset] = useState('Northwind')
 
   const handleSearch = async () => {
     try {
+      setShowResults(false);
+      setIsQueryRunning(true);
       const res = await VA.run(cypherQuery);
       setSearchResult(res);
       setShowResults(true);
@@ -357,6 +454,7 @@ function App() {
         }
       ]);
     } catch (error) {
+      setIsQueryRunning(false);
       throw error;
     }
   };
@@ -1167,6 +1265,7 @@ function App() {
                 type="primary"
                 disabled={state.nodes.length === 0}
                 onClick={handleSearch}
+                loading={isQueryRunning}
               >
                 Play
               </Button>
@@ -1375,19 +1474,14 @@ function App() {
           <Modal
             title="Connect to Database"
             visible={connectModalVisible}
+            okText="Connect"
+            okButtonProps={connectTabKey === 'connect' ? {} : { style: { display: 'none' } }}
             onOk={() => {
               form
                 .validateFields()
                 .then((values) => {
                   form.resetFields();
-                  let { uri } = values;
-                  // Check for existing protocol
-                  if (!/^[a-z0-9+.-]+:\/\//i.test(uri)) {
-                    uri = `bolt+s://${uri}`;
-                  }
-                  
-                  setDatabaseSource({ ...values, uri });
-                  setConnectModalVisible(false);
+                  connectToDatabase(values, { closeModal: true });
                 })
                 .catch((info) => {
                   console.log('Validate Failed:', info);
@@ -1395,52 +1489,171 @@ function App() {
             }}
             onCancel={() => setConnectModalVisible(false)}
           >
-            <Form
-              form={form}
-              layout="vertical"
-              name="form_in_modal"
-              initialValues={{
-                uri: 'localhost:7687',
-                username: 'neo4j',
-                database: 'neo4j'
-              }}
-            >
-              <Form.Item
-                name="uri"
-                label="Connection URI"
-                className="db-uri-field"
-                rules={[{ required: true, message: 'Please input the URI of the database!' }]}
-              >
-                <Input addonBefore="bolt+s://" />
-              </Form.Item>
-              <Form.Item
-                name="database"
-                label="Database Name"
-                rules={[{ required: true, message: 'Please input the database name!' }]}
-              >
-                <Input />
-              </Form.Item>
-              <Row gutter={12}>
-                <Col span={12}>
+            <Tabs activeKey={connectTabKey} onChange={setConnectTabKey}>
+              <TabPane tab="Connect" key="connect">
+                <Form
+                  form={form}
+                  layout="vertical"
+                  name="form_in_modal"
+                  initialValues={{
+                    uri: 'localhost:7687',
+                    username: 'neo4j',
+                    database: 'neo4j'
+                  }}
+                >
                   <Form.Item
-                    name="username"
-                    label="Username"
-                    rules={[{ required: true, message: 'Please input the username!' }]}
+                    name="uri"
+                    label="Connection URI"
+                    className="db-uri-field"
+                    rules={[{ required: true, message: 'Please input the URI of the database!' }]}
+                  >
+                    <Input addonBefore="bolt+s://" />
+                  </Form.Item>
+                  <Form.Item
+                    name="database"
+                    label="Database Name"
+                    rules={[{ required: true, message: 'Please input the database name!' }]}
                   >
                     <Input />
                   </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    name="password"
-                    label="Password"
-                    rules={[{ required: true, message: 'Please input the password!' }]}
+                  <Row gutter={12}>
+                    <Col span={12}>
+                      <Form.Item
+                        name="username"
+                        label="Username"
+                        rules={[{ required: true, message: 'Please input the username!' }]}
+                      >
+                        <Input />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item
+                        name="password"
+                        label="Password"
+                        rules={[{ required: true, message: 'Please input the password!' }]}
+                      >
+                        <Input.Password />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </Form>
+              </TabPane>
+              <TabPane tab={`Recents (${recentDatabases.length})`} key="recents">
+                <div className="recent-db-header">
+                  <div className="recent-db-title">Recent connections</div>
+                  <Button
+                    type="link"
+                    danger
+                    size="small"
+                    disabled={recentDatabases.length === 0}
+                    onClick={handleClearRecent}
                   >
-                    <Input.Password />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </Form>
+                    Clear history
+                  </Button>
+                </div>
+                {recentDatabases.length === 0 ? (
+                  <Empty description="No recent connections yet." image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                ) : (
+                  <div className="recent-db-list">
+                    {recentDatabases.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="recent-db-row"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleRecentRowClick(entry)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            handleRecentRowClick(entry);
+                          }
+                        }}
+                      >
+                        <div className="recent-db-main">
+                          <div className="recent-db-name">{entry.database || 'Unnamed database'}</div>
+                          <div className="recent-db-meta">
+                            {entry.uri} {entry.username ? `- ${entry.username}` : ''}
+                          </div>
+                        </div>
+                        <div className="recent-db-actions">
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<PlayCircleOutlined />}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              connectToDatabase(entry, { closeModal: true, existingId: entry.id });
+                            }}
+                          />
+                          <Button
+                            type="text"
+                            size="small"
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleRecentDelete(entry.id);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabPane>
+            </Tabs>
+          </Modal>
+
+          <Modal
+            title="Recent Connection"
+            visible={recentDetailsVisible}
+            onCancel={() => {
+              setRecentDetailsVisible(false);
+              setActiveRecent(null);
+            }}
+            footer={[
+              <Button
+                key="close"
+                onClick={() => {
+                  setRecentDetailsVisible(false);
+                  setActiveRecent(null);
+                }}
+              >
+                Close
+              </Button>,
+              <Button
+                key="connect"
+                type="primary"
+                disabled={!activeRecent}
+                onClick={() => {
+                  if (!activeRecent) return;
+                  connectToDatabase(activeRecent, { closeModal: true, closeDetails: true, existingId: activeRecent.id });
+                }}
+              >
+                Connect
+              </Button>
+            ]}
+          >
+            {activeRecent ? (
+              <div className="recent-db-details">
+                <div className="recent-db-detail-row">
+                  <div className="recent-db-detail-label">Database</div>
+                  <div className="recent-db-detail-value">{activeRecent.database || '-'}</div>
+                </div>
+                <div className="recent-db-detail-row">
+                  <div className="recent-db-detail-label">URI</div>
+                  <div className="recent-db-detail-value">{activeRecent.uri || '-'}</div>
+                </div>
+                <div className="recent-db-detail-row">
+                  <div className="recent-db-detail-label">Username</div>
+                  <div className="recent-db-detail-value">{activeRecent.username || '-'}</div>
+                </div>
+                <div className="recent-db-detail-row">
+                  <div className="recent-db-detail-label">Password</div>
+                  <div className="recent-db-detail-value">{activeRecent.password ? '********' : 'Not saved'}</div>
+                </div>
+              </div>
+            ) : null}
           </Modal>
 
           {showResults ? 

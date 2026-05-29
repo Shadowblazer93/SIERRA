@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Button, Form, Input, Switch, Select, Space, Typography, Divider, Row, Col, Modal, message } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined, RetweetOutlined, PlusOutlined, DeleteOutlined, DragOutlined, EyeInvisibleOutlined, InfoCircleOutlined, UserOutlined } from '@ant-design/icons';
+import { ArrowUpOutlined, ArrowDownOutlined, RetweetOutlined, PlusOutlined, DeleteOutlined, DragOutlined, EyeInvisibleOutlined, InfoCircleOutlined, UserOutlined, CheckCircleFilled } from '@ant-design/icons';
 import { supabase } from '../../supabaseClient';
 import './index.css';
 
@@ -41,6 +41,17 @@ const QueryControls = forwardRef(({
   const [changePasswordLoading, setChangePasswordLoading] = useState(false);
   const [changePasswordForm] = Form.useForm();
   const [accountLabel, setAccountLabel] = useState('');
+  const supportedCypherFeatures = [
+    'MATCH patterns (nodes + relationships)',
+    'WHERE predicates with AND/OR (including DNF)',
+    'Directed/undirected relationships + types',
+    'Variable-length paths (hops)',
+    'Equi and theta joins',
+    'Aggregations + GROUP BY',
+    'WITH projections',
+    'RETURN DISTINCT',
+    'Query Controls (ORDER BY, SKIP, LIMIT)'
+  ];
 
   useImperativeHandle(ref, () => ({
     toggleQueryControls: () => setVisible((prev) => !prev),
@@ -469,12 +480,13 @@ const QueryControls = forwardRef(({
               </Form>
             </Modal>
             <Modal
-              title="Graph Legend"
+              title="Information"
               visible={legendVisible}
               onCancel={() => setLegendVisible(false)}
               footer={null}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <Divider orientation="left" style={{ margin: '8px -20' }}>Graph Legend</Divider>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <svg width="140" height="16">
                     <line
@@ -526,6 +538,15 @@ const QueryControls = forwardRef(({
                   </svg>
                   <Text>AND</Text>
                   <code style={{ background: '#f0f0f0', borderRadius: 4, fontSize: 12 }}>a.x AND b.y</code>
+                </div>
+                <Divider orientation="left" style={{ margin: '8px -20' }}>Supported Cypher Features</Divider>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {supportedCypherFeatures.map((feature) => (
+                    <div key={feature} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <CheckCircleFilled style={{ color: '#52c41a' }} />
+                      <Text>{feature}</Text>
+                    </div>
+                  ))}
                 </div>
               </div>
             </Modal>

@@ -57,7 +57,7 @@
   border-right-style: solid;
   border-right-width: thin;
   border-right-color: grey;
-  padding: 2rem;
+  padding: 1rem;
   z-index: 20;
   top: 0;
   left: 0;
@@ -82,10 +82,77 @@
   width: fit-content;
   min-width: 50%;
   max-width: 80%;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: result-pop-in 180ms ease-out;
+  transform-origin: center bottom;
   border-radius: 20px;
   box-shadow: 0 10px 25px rgba(0,0,0,0.15);
   border: 1px solid rgba(0,0,0,0.05);
+}
+
+.result-modal-center.is-closing {
+  animation: result-pop-out 160ms ease-in forwards;
+}
+
+.result-modal-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  margin-bottom: 0.5rem;
+}
+
+.result-modal-body {
+  flex: 1;
+  overflow: auto;
+  padding-bottom: 1rem;
+}
+
+.result-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+  margin-bottom: -20px;
+}
+
+.result-modal-footer .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.result-modal-button-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes result-pop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes result-pop-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
 }
 
 .result-modal-center table {
@@ -190,6 +257,90 @@ td {
 
 .link-tool-dropdown .link-tool-or.ant-select-item-option {
   background: #ffc88d;
+}
+
+.recent-db-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.recent-db-title {
+  font-weight: 600;
+  color: #2d3640;
+}
+
+.recent-db-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recent-db-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.recent-db-row:hover {
+  border-color: rgba(24, 144, 255, 0.6);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.recent-db-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.recent-db-name {
+  font-weight: 600;
+  color: #1f2a36;
+}
+
+.recent-db-meta {
+  color: #6b7280;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-db-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.recent-db-details {
+  display: grid;
+  gap: 12px;
+}
+
+.recent-db-detail-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.recent-db-detail-label {
+  font-weight: 600;
+  color: #1f2a36;
+}
+
+.recent-db-detail-value {
+  color: #4b5563;
+  word-break: break-word;
 }
 
 .link-tool-dropdown .link-tool-and.ant-select-item-option {

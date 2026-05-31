@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Button, Form, Input, Switch, Select, Space, Typography, Divider, Row, Col, Modal, message } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined, RetweetOutlined, PlusOutlined, DeleteOutlined, DragOutlined, EyeInvisibleOutlined, InfoCircleOutlined, UserOutlined, CheckCircleFilled } from '@ant-design/icons';
+import { ArrowUpOutlined, ArrowDownOutlined, RetweetOutlined, PlusOutlined, DeleteOutlined, DragOutlined, EyeInvisibleOutlined, UserOutlined, CheckCircleFilled } from '@ant-design/icons';
 import { supabase } from '../../supabaseClient';
 import './index.css';
 
@@ -56,7 +56,8 @@ const QueryControls = forwardRef(({
   useImperativeHandle(ref, () => ({
     toggleQueryControls: () => setVisible((prev) => !prev),
     openQueryControls: () => setVisible(true),
-    openSettings: () => setSettingsVisible(true)
+    openSettings: () => setSettingsVisible(true),
+    openLegend: () => setLegendVisible(true)
   }), []);
 
   // Parse return clause string into individual items
@@ -308,24 +309,7 @@ const QueryControls = forwardRef(({
 
   if (!visible) {
     return (
-        <div 
-            style={{ 
-                position: 'fixed',
-                left: 45, 
-                bottom: 10,
-                zIndex: 1000
-            }}
-        >
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <Button
-                  type="default"
-                  shape="default"
-                  icon={<InfoCircleOutlined />}
-                  size="middle"
-                  onClick={() => setLegendVisible(true)}
-                  style={{ cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
-              />
-            </div>
+      <>
             <Modal
               title="Settings"
               visible={settingsVisible}
@@ -550,7 +534,7 @@ const QueryControls = forwardRef(({
                 </div>
               </div>
             </Modal>
-        </div>
+        </>
     );
   }
 

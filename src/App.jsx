@@ -20,13 +20,14 @@ import AndLinkEdge from './components/AndLinkEdge';
 import PredicateLinkModal from './components/PredicateLinkModal';
 import ConfirmationAlert from './components/ConfirmationAlert';
 import { Button, Spin, Select, Drawer, Modal, Form, Input, Row, Col, message, Tabs, Empty } from 'antd';
-import { InfoCircleOutlined, BuildOutlined, CopyOutlined, LoadingOutlined, ApiOutlined, ArrowLeftOutlined, NodeIndexOutlined, EyeOutlined, EditOutlined, SettingOutlined, SnippetsOutlined, DeleteOutlined, PlayCircleOutlined } from '@ant-design/icons'
+import { InfoCircleOutlined, QuestionCircleOutlined, BuildOutlined, CopyOutlined, LoadingOutlined, ApiOutlined, ArrowLeftOutlined, NodeIndexOutlined, EyeOutlined, EditOutlined, SettingOutlined, SnippetsOutlined, DeleteOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import Title from 'antd/lib/typography/Title';
 import { getNodeId } from './utils/getNodeId';
 import useVisualActions from './hooks/useVisualActions'
 import JoinGraphView from './components/JoinGraphView';
 import QueryControls from './components/QueryControls';
 import QueryClipboardSidebar from './components/QueryClipboardSidebar';
+import HelpGuideModal from './components/HelpGuide';
 import { convertToGraph } from './utils/converToGraph';
 import { buildDnfAndLinksFromQuery } from './utils/dnfGraph';
 import { buildOrGroupRoots } from './utils/orGroupRoots';
@@ -182,6 +183,7 @@ function App() {
   const suppressQuerySyncRef = useRef(false);
   const [queryControlsVisible, setQueryControlsVisible] = useState(false);
   const [showcaseModalVisible, setShowcaseModalVisible] = useState(false);
+  const [helpGuideVisible, setHelpGuideVisible] = useState(false);
   const [showcaseJson, setShowcaseJson] = useState('');
   const reactFlowInstanceRef = useRef(null);
   const [darkModeEnabled, setDarkModeEnabled] = useState(() => {
@@ -1242,6 +1244,22 @@ function App() {
                   onClick={() => queryControlsRef.current?.openSettings()}
                 />
               </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 12 }}>
+                <Button
+                  type="default"
+                  shape="default"
+                  icon={<InfoCircleOutlined />}
+                  size="middle"
+                  onClick={() => queryControlsRef.current?.openLegend?.()}
+                />
+                <Button
+                  type="default"
+                  shape="default"
+                  icon={<QuestionCircleOutlined />}
+                  size="middle"
+                  onClick={() => setHelpGuideVisible(true)}
+                />
+              </div>
               <Button
                 type="default"
                 shape="circle"
@@ -1341,6 +1359,10 @@ function App() {
             darkThemePreset={darkThemePreset}
             onThemePresetChange={setDarkThemePreset}
             themePresets={darkreaderThemes}
+          />
+          <HelpGuideModal
+            visible={helpGuideVisible}
+            onClose={() => setHelpGuideVisible(false)}
           />
           <QueryClipboardSidebar
             visible={queryClipboardVisible}

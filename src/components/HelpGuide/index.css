@@ -1,0 +1,146 @@
+.help-guide-modal .ant-modal-body {
+  padding: 0;
+}
+
+.help-guide-modal .ant-modal-content {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.help-guide-layout {
+  min-height: 680px;
+}
+
+.help-guide-sider {
+  background: #ffffff;
+  border-right: 1px solid #f0f0f0;
+  padding: 16px;
+}
+
+.help-guide-sider-title {
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.help-guide-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.help-guide-list-group {
+  background: #fafafa;
+  border-radius: 10px;
+}
+
+.help-guide-list-item {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.help-guide-list-item:hover {
+  background: #f0f0f0;
+}
+
+.help-guide-list-item.is-active {
+  background: #e6f4ff;
+}
+
+.help-guide-sublist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.help-guide-list-subitem {
+  padding-left: 20px;
+  font-size: 0.92rem;
+}
+
+.help-guide-list-subitem::before {
+  content: "↳";
+  color: #8c8c8c;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.help-guide-content {
+  padding: 20px 24px;
+  background: #fafafa;
+}
+
+.help-guide-graph-wrapper {
+  margin-top: 16px;
+}
+
+.help-guide-graph {
+  height: 220px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(#f0f0f0 1px, transparent 1px),
+    linear-gradient(90deg, #f0f0f0 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.help-guide-graph-empty {
+  height: 220px;
+  border: 1px dashed #d9d9d9;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8c8c8c;
+  background: #ffffff;
+}
+
+.help-guide-details-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.help-guide-usage-card {
+  background: #e9f7ec;
+  border-radius: 14px;
+  border: 1px solid #c7ebcf;
+}
+
+.help-guide-usage-card .ant-card-body {
+  font-size: 1.05rem;
+  padding: 12px 14px;
+}
+
+.help-guide-usage-card .ant-card-head {
+  min-height: 40px;
+  padding: 0 14px;
+}
+
+.help-guide-usage-card .ant-card-head-title {
+  padding: 8px 0;
+}
+
+.help-guide-usage-card .help-guide-details-list {
+  padding-left: 16px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 960px) {
+  .help-guide-layout {
+    min-height: auto;
+  }
+
+  .help-guide-sider {
+    width: 100% !important;
+    border-right: none;
+    border-bottom: 1px solid #f0f0f0;
+  }
+}

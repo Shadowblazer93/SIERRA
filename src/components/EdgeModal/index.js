@@ -115,6 +115,7 @@ const EdgeModal = ({
                 <Button 
                   onClick={onOpenCardinalityModal} 
                   style={{marginTop: 10, width: '100%'}}
+                  disabled={rsAttributes.length === 0}
                 >
                   Edit Relationship Properties
                 </Button>
@@ -122,60 +123,7 @@ const EdgeModal = ({
             </>
           )}
 
-          {isDirected && (rs !== "") && rsAttributes.length > 0 &&
-            (
-              <>
-              <Divider orientation="left">Selected Predicates</Divider>
-              <div style={{padding: '0px 15px 10px'}}>
-                {Object.keys(predicates).map((attr, i) => {
-                  const colour = PRED_COLOR_V2[rsAttributes.indexOf(attr) % PRED_COLOR_V2.length]
-                  return (
-                    <div key={`pt-${i}`}>
-                      <SelectTag onClick={() => {showChildrenDrawer(attr)}} colour={colour.name} key={`${attr}-k`} text={attr} />
-                      <PredicateDraw
-                        onClose={() => onChildrenDrawerClose(attr)}
-                        attr={attr}
-                        oldPredicate={{ attr: attr, preds: predicates[attr].data }}
-                        updatePredicate={updatePredicate}
-                        deletePredicate={deletePredicate}
-                        propValues={propData
-                          .filter((item) => Object.keys(item).includes(attr))
-                          .map((item) => item[attr])
-                        }
-                        titleColor={colour.secondary}
-                        visible={childrenDrawer[attr]}/>
-                    </div>
-                  )
-                })}
-              </div>
-              <Divider orientation="left">Properties</Divider>
-              <div style={{padding: '0px 15px 10px'}}>
-                {rsAttributes.map((attr, i) => (
-                    <PredicateCheckBox
-                      key={`${attr}-k`}
-                      title={attr}
-                      checked={Object.keys(predicates).indexOf(attr) !== -1}
-                      onAddPredicate={() => {
-                        addPredicate(attr, PRED_COLOR_V2[i % PRED_COLOR_V2.length])
-                        setChildDrawer({
-                          ...childrenDrawer,
-                          [attr]:true
-                        })
-                        }
-                      }
-                      onDeletePredicate={() => {
-                        deletePredicate(attr)
-                      }}
-                      palette={PRED_COLOR_V2[i % PRED_COLOR_V2.length]} />
-                  ))
-                }
-          </div>
-        </>
-          )
-
-        }
-
-        {/*Return Path*/}
+          {/*Return Path*/}
           <Divider orientation="left">Return Path</Divider>
           <div style={{padding: '0px 15px 10px'}}>
             <Checkbox

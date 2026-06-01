@@ -374,7 +374,7 @@ function CustomEdge({
           {rs}
         </textPath>
       </text>
-      {cardinality && !(cardinality.min === 1 && cardinality.max === 1 && numBubbles === 0) && (
+      {cardinality && !(cardinality.min === 1 && cardinality.max === 1) && (
         <>
           {/* Cardinality box with its own tooltip and click */}
           <Tooltip
@@ -528,27 +528,34 @@ function CustomEdge({
               </foreignObject>
             </g>
           </Tooltip>
-          {/* Render property bubbles as separate elements, overlaid above the box */}
-          {Array.isArray(cardinalityProps) && cardinalityProps.map((prop, idx) => (
-            <Tooltip
-              key={prop.key || idx}
-              title={<span><b>{prop.key}</b>{prop.value ? `: ${prop.value}` : ''}</span>}
-              placement="bottom"
-              overlayStyle={{ zIndex: 9999 }}
-            >
-              <circle
-                cx={midX - (boxWidth / 2) + 30 + idx * bubbleSpacing}
-                cy={midY + 3}
-                r={7}
-                fill={prop.color || '#eee'}
-                stroke="#333"
-                strokeWidth={1}
-                // style={{ cursor: 'pointer', pointerEvents: 'all' }}
-              />
-            </Tooltip>
-          ))}
         </>
       )}
+      {/* Render property bubbles - conditionally positioned based on whether cardinality box is shown */}
+      {Array.isArray(cardinalityProps) && cardinalityProps.map((prop, idx) => {
+        const showCardinalityBox = cardinality && !(cardinality.min === 1 && cardinality.max === 1);
+        const bubbleX = showCardinalityBox 
+          ? midX - (boxWidth / 2) + 30 + idx * bubbleSpacing
+          : midX - (numBubbles - 1) * bubbleSpacing / 2 + idx * bubbleSpacing;
+        const bubbleY = showCardinalityBox ? midY + 3 : midY - 10;
+        return (
+          <Tooltip
+            key={prop.key || idx}
+            title={<span><b>{prop.key}</b>{prop.value ? `: ${prop.value}` : ''}</span>}
+            placement="bottom"
+            overlayStyle={{ zIndex: 9999 }}
+          >
+            <circle
+              cx={bubbleX}
+              cy={bubbleY}
+              r={7}
+              fill={prop.color || '#eee'}
+              stroke="#333"
+              strokeWidth={1}
+              // style={{ cursor: 'pointer', pointerEvents: 'all' }}
+            />
+          </Tooltip>
+        );
+      })}
       <EdgeModal
         source={data.source}
         destination={data.destination}

@@ -1,20 +1,35 @@
 .help-guide-modal .ant-modal-body {
   padding: 0;
+  height: 100%;
 }
 
 .help-guide-modal .ant-modal-content {
   border-radius: 16px;
   overflow: hidden;
+  height: 95vh;
+  max-height: 800px;
 }
 
 .help-guide-layout {
   min-height: 680px;
+  height: 100%;
 }
 
 .help-guide-sider {
   background: #ffffff;
   border-right: 1px solid #f0f0f0;
   padding: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.help-guide-sider .ant-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
 }
 
 .help-guide-sider-title {
@@ -26,6 +41,11 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 4px;
+  min-height: 0;
+  max-height: min(calc(95vh - 80px), 720px);
 }
 
 .help-guide-list-group {
@@ -37,7 +57,7 @@
   width: 100%;
   text-align: left;
   border: none;
-  background: transparent;
+  background: #f5f8ff;
   padding: 8px 10px;
   border-radius: 8px;
   cursor: pointer;
@@ -45,11 +65,22 @@
 }
 
 .help-guide-list-item:hover {
-  background: #f0f0f0;
+  background: #e6f4ff;
 }
 
 .help-guide-list-item.is-active {
-  background: #e6f4ff;
+  background: #bae0ff;
+}
+
+.help-guide-list-item.is-parent {
+  cursor: default;
+  font-weight: 600;
+  color: #595959;
+  background: #f0f3fa;
+}
+
+.help-guide-list-item.is-parent:hover {
+  background: #f0f3fa;
 }
 
 .help-guide-sublist {
@@ -80,19 +111,17 @@
   margin-top: 16px;
 }
 
-.help-guide-graph {
-  height: 220px;
+.help-guide-image {
+  width: 100%;
+  height: auto;
+  display: block;
   border: 1px solid #f0f0f0;
   border-radius: 8px;
-  background-color: #ffffff;
-  background-image:
-    linear-gradient(#f0f0f0 1px, transparent 1px),
-    linear-gradient(90deg, #f0f0f0 1px, transparent 1px);
-  background-size: 20px 20px;
+  background: #ffffff;
 }
 
-.help-guide-graph-empty {
-  height: 220px;
+.help-guide-image-placeholder {
+  min-height: 220px;
   border: 1px dashed #d9d9d9;
   border-radius: 8px;
   display: flex;

@@ -1,15 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import ReactFlow, { ReactFlowProvider } from 'react-flow-renderer';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Layout, Modal, Space, Typography } from 'antd';
-import Node from '../Node';
-import CustomEdge from '../CustomEdge';
-import PredicateLinkEdge from '../PredicateLinkEdge';
-import OrLinkEdge from '../OrLinkEdge';
-import AndLinkEdge from '../AndLinkEdge';
-import { Context, initialState } from '../../Store';
-import { buildOrGroupRoots } from '../../utils/orGroupRoots';
-import guideMap from '../../guides.json';
 import './index.css';
+
+const buildGuideImageMap = () => {
+  const guideImageContext = require.context('../../assets/guide', false, /\.(png|jpe?g|svg)$/i);
+  return guideImageContext.keys().reduce((acc, key) => {
+    const filename = key.replace('./', '');
+    const basename = filename.replace(/\.[^/.]+$/, '');
+    const moduleValue = guideImageContext(key);
+    acc[basename.toLowerCase()] = moduleValue?.default || moduleValue;
+    return acc;
+  }, {});
+};
 
 const FEATURES = [
   {
@@ -106,7 +108,7 @@ const FEATURES = [
   },
   {
     id: 'joins',
-    title: 'Joins (Equi + Theta)',
+    title: 'Joins',
     summary: 'Link predicates between nodes to compare attributes across different entities.',
     usage: [
       'Create a predicate on each node you want to compare.',
@@ -151,15 +153,85 @@ const FEATURES = [
     showcaseKey: 'OR Links'
   },
   {
-    id: 'nested-predicates',
-    title: 'Nested Predicates',
-    summary: 'Use nested predicate groups to construct advanced boolean logic.',
+    id: 'nesting',
+    title: 'Nesting',
+    summary: 'Create nested predicate groups and inspect their logical structure.',
     usage: [
-      'Open the predicate modal and create nested levels.',
-      'Switch between AND / OR connectors per group.',
-      'Toggle DNF mode to visualize the expanded expression.'
+      'Group predicates into nested levels.',
+      'Use Change Nesting to rearrange groups.',
+      'Review the Expression Tree for precedence.'
     ],
-    showcaseKey: 'Nested Predicates'
+    showcaseKey: 'Nesting',
+    children: [
+      {
+        id: 'nesting-change',
+        title: 'Change Nesting',
+        summary: 'Rearrange predicate groups to change boolean structure without rebuilding them.',
+        usage: [
+          'Open the predicate modal and select Change Nesting.',
+          'Move predicates between groups to reshape logic.',
+          'Confirm the updated grouping before closing.'
+        ],
+        showcaseKey: 'Change Nesting'
+      },
+      {
+        id: 'nesting-expression-tree',
+        title: 'Expression Tree',
+        summary: 'Visualize predicate logic as an expression tree to understand grouping and precedence.',
+        usage: [
+          'Open the predicate modal to view the expression tree.',
+          'Expand groups to inspect nested boolean structure.',
+          'Use the tree to verify how predicates combine.'
+        ],
+        showcaseKey: 'Expression Tree'
+      }
+    ]
+  },
+  {
+    id: 'ui-features',
+    title: 'UI Features',
+    summary: 'Navigate the interface and use helper panels to build and review queries faster.',
+    usage: [
+      'Use the controls bar to run, reset, or manage your query.',
+      'Copy queries from the clipboard panel.',
+      'Review join details in the join view box.'
+    ],
+    showcaseKey: 'UI Features',
+    children: [
+      {
+        id: 'ui-features-query-controls',
+        title: 'Query Controls',
+        summary: 'Access the primary actions for running, saving, and clearing queries.',
+        usage: [
+          'Use the Run button to execute the query.',
+          'Reset to clear the current graph.',
+          'Open additional actions from the controls bar.'
+        ],
+        showcaseKey: 'Query Controls'
+      },
+      {
+        id: 'ui-features-clipboard',
+        title: 'Clipboard',
+        summary: 'Copy, review, and reuse generated Cypher queries.',
+        usage: [
+          'Open the clipboard panel to view saved queries.',
+          'Copy a query with one click.',
+          'Paste into your editor or reuse later.'
+        ],
+        showcaseKey: 'Clipboard'
+      },
+      {
+        id: 'ui-features-join-view-box',
+        title: 'Join View Box',
+        summary: 'Inspect join relationships and predicate link details.',
+        usage: [
+          'Open the join view to see active joins.',
+          'Review join operators and matched fields.',
+          'Use it to validate complex join logic.'
+        ],
+        showcaseKey: 'Join View Box'
+      }
+    ]
   }
 ];
 
@@ -171,258 +243,59 @@ const flattenFeatures = (items) => items.reduce((acc, item) => {
   return acc;
 }, []);
 
-const pickShowcase = (key) => {
-  if (!guideMap || typeof guideMap !== 'object') return null;
-  if (key && guideMap[key]) return guideMap[key];
-  const values = Object.values(guideMap || {}).filter(Boolean);
-  return values.length > 0 ? values[0] : null;
+const getDefaultActiveId = () => {
+  for (const feature of FEATURES) {
+    if (Array.isArray(feature.children) && feature.children.length > 0) {
+      return feature.children[0].id;
+    }
+    if (feature?.id) {
+      return feature.id;
+    }
+  }
+  return null;
 };
 
-const buildShowcaseState = (showcase) => {
-  const graph = showcase?.graph || {};
-  const dnfHoverCount = Number.isFinite(graph.dnfHoverCount) ? graph.dnfHoverCount : 0;
-  const dnfHovering = typeof graph.dnfHovering === 'boolean' ? graph.dnfHovering : dnfHoverCount > 0;
+const GuideImage = ({ title, guideImages }) => {
+  const normalizedTitle = title ? title.toLowerCase() : '';
+  const imageSrc = guideImages[normalizedTitle];
 
-  return {
-    ...initialState,
-    nodes: Array.isArray(graph.nodes) ? graph.nodes : [],
-    edges: Array.isArray(graph.edges) ? graph.edges : [],
-    predicateLinks: Array.isArray(graph.predicateLinks) ? graph.predicateLinks : [],
-    orLinks: Array.isArray(graph.orLinks) ? graph.orLinks : [],
-    andLinks: Array.isArray(graph.andLinks) ? graph.andLinks : [],
-    predDisplayStatus: graph.predDisplayStatus || initialState.predDisplayStatus,
-    orRepresentation: graph.orRepresentation || initialState.orRepresentation,
-    dnfMode: !!graph.dnfMode,
-    dnfLinksVisible: !!graph.dnfLinksVisible,
-    dnfAndGroupingEnabled: !!graph.dnfAndGroupingEnabled,
-    dnfHoverCount,
-    dnfHovering
-  };
-};
-
-const MiniShowcaseGraph = ({ feature }) => {
-  const reactFlowRef = useRef(null);
-  const canvasRef = useRef(null);
-  const noopDispatch = useCallback(() => {}, []);
-  const [showcaseState, setShowcaseState] = useState(() => buildShowcaseState(pickShowcase(feature?.showcaseKey)));
-  const showcase = useMemo(() => pickShowcase(feature?.showcaseKey), [feature?.showcaseKey]);
-
-  useEffect(() => {
-    setShowcaseState(buildShowcaseState(showcase));
-  }, [showcase]);
-
-  const fitShowcase = useCallback(() => {
-    const instance = reactFlowRef.current;
-    if (!instance || typeof instance.fitView !== 'function') return;
-    instance.fitView({ padding: 0.2, includeHiddenNodes: false, duration: 0 });
-  }, []);
-
-  useEffect(() => {
-    const canvasElement = canvasRef.current;
-    if (!canvasElement || typeof ResizeObserver === 'undefined') return undefined;
-
-    let frameId = 0;
-    const observer = new ResizeObserver(() => {
-      window.cancelAnimationFrame(frameId);
-      frameId = window.requestAnimationFrame(() => {
-        fitShowcase();
-      });
-    });
-
-    observer.observe(canvasElement);
-
-    return () => {
-      observer.disconnect();
-      window.cancelAnimationFrame(frameId);
-    };
-  }, [fitShowcase]);
-
-  const orGroupRoots = useMemo(
-    () => buildOrGroupRoots(showcaseState.nodes, showcaseState.orLinks),
-    [showcaseState.nodes, showcaseState.orLinks]
-  );
-
-  const orGroupColors = useMemo(
-    () => (showcase?.orGroupColors && typeof showcase.orGroupColors === 'object' ? showcase.orGroupColors : {}),
-    [showcase]
-  );
-
-  const getOrGroupColor = useCallback(
-    (groupId) => orGroupColors[groupId] || '#ff8c00',
-    [orGroupColors]
-  );
-
-  const predicateLinkElements = useMemo(
-    () => (showcaseState.predicateLinks || []).map((link, idx) => ({
-      id: `predicate-link-${idx}`,
-      source: link.from.nodeId,
-      target: link.to.nodeId,
-      sourceHandle: link.from.attr,
-      targetHandle: link.to.attr,
-      type: 'predicateLink',
-      data: {
-        fromAttr: link.from.attr,
-        toAttr: link.to.attr,
-        operator: link.operator,
-        joinType: link.joinType
-      }
-    })),
-    [showcaseState.predicateLinks]
-  );
-
-  const orLinkElements = useMemo(
-    () => (showcaseState.orLinks || []).map((link, idx) => {
-      const fromKey = `${link.from.nodeId}_${link.from.attr}`;
-      const toKey = `${link.to.nodeId}_${link.to.attr}`;
-      const sourceGroupId = orGroupRoots[fromKey];
-      const targetGroupId = orGroupRoots[toKey];
-      const isSameNode = String(link.from.nodeId) === String(link.to.nodeId);
-      const isSameGroup = !!sourceGroupId && !!targetGroupId && sourceGroupId === targetGroupId;
-      const orRepresentation = showcaseState.orRepresentation || 'sunflower';
-
-      if (orRepresentation === 'sunflower' && isSameNode && isSameGroup) {
-        return null;
-      }
-
-      const groupId = sourceGroupId || targetGroupId || fromKey;
-      const groupColor = getOrGroupColor(groupId);
-
-      return {
-        id: `or-link-${idx}`,
-        source: link.from.nodeId,
-        target: link.to.nodeId,
-        sourceHandle: link.from.attr,
-        targetHandle: link.to.attr,
-        type: 'orLink',
-        data: {
-          fromAttr: link.from.attr,
-          toAttr: link.to.attr,
-          orGroupId: groupId,
-          orGroupColor: groupColor,
-          sourceGroupId,
-          targetGroupId,
-          isSameGroup,
-          orRepresentation,
-          isGroupHovering: false,
-          hideEdgeLabel: isSameNode && isSameGroup,
-          opacity: 1
-        }
-      };
-    }).filter(Boolean),
-    [showcaseState.orLinks, showcaseState.orRepresentation, orGroupRoots, getOrGroupColor]
-  );
-
-  const andLinkElements = useMemo(
-    () => (showcaseState.andLinks || []).map((link, idx) => ({
-      id: `and-link-${idx}`,
-      source: link.from.nodeId,
-      target: link.to.nodeId,
-      sourceHandle: link.from.attr,
-      targetHandle: link.to.attr,
-      type: 'andLink',
-      data: {
-        groupId: link.groupId,
-        color: link.color,
-        opacity: 1
-      }
-    })),
-    [showcaseState.andLinks]
-  );
-
-  const edgeElements = useMemo(
-    () => (showcaseState.edges || []).map((edge) => {
-      const sourceNode = showcaseState.nodes.find((n) => n.id === edge.source);
-      const targetNode = showcaseState.nodes.find((n) => n.id === edge.target);
-      return {
-        ...edge,
-        data: {
-          ...edge.data,
-          isBold: edge.isBold,
-          sourcePredicates: sourceNode?.data?.predicates || {},
-          targetPredicates: targetNode?.data?.predicates || {}
-        }
-      };
-    }),
-    [showcaseState.edges, showcaseState.nodes]
-  );
-
-  const nodeElements = useMemo(
-    () => (showcaseState.nodes || []).map((node) => ({
-      ...node,
-      data: {
-        ...node.data,
-        color: node.color,
-        radius: node.radius,
-        isBold: node.isBold,
-        orGroupRoots
-      }
-    })),
-    [showcaseState.nodes, orGroupRoots]
-  );
-
-  const elements = useMemo(
-    () => nodeElements.concat(andLinkElements, edgeElements, predicateLinkElements, orLinkElements),
-    [nodeElements, andLinkElements, edgeElements, predicateLinkElements, orLinkElements]
-  );
-
-  if (!showcase) {
-    return <div className="help-guide-graph-empty">No showcase available.</div>;
+  if (!imageSrc) {
+    return <div className="help-guide-image-placeholder">Image coming soon.</div>;
   }
 
-  return (
-    <div className="help-guide-graph" ref={canvasRef}>
-      <Context.Provider value={[showcaseState, noopDispatch]}>
-        <ReactFlowProvider>
-          <ReactFlow
-            ref={reactFlowRef}
-            elements={elements}
-            nodeTypes={{ special: Node }}
-            edgeTypes={{
-              custom: CustomEdge,
-              predicateLink: PredicateLinkEdge,
-              orLink: OrLinkEdge,
-              andLink: AndLinkEdge
-            }}
-            nodesDraggable={false}
-            nodesConnectable={false}
-            elementsSelectable={false}
-            zoomOnScroll
-            zoomOnDoubleClick
-            zoomOnPinch
-            panOnScroll={false}
-            panOnDrag
-            onLoad={(instance) => {
-              reactFlowRef.current = instance;
-              const viewport = showcase?.viewport;
-              if (viewport && typeof instance.setTransform === 'function') {
-                instance.setTransform(viewport);
-              }
-              window.requestAnimationFrame(() => {
-                fitShowcase();
-              });
-            }}
-          />
-        </ReactFlowProvider>
-      </Context.Provider>
-    </div>
-  );
+  return <img className="help-guide-image" src={imageSrc} alt={`${title} guide`} />;
 };
 
 function HelpGuideModal({ visible, onClose }) {
-  const [activeId, setActiveId] = useState(FEATURES[0]?.id);
+  const [activeId, setActiveId] = useState(() => getDefaultActiveId());
+  const [guideImages, setGuideImages] = useState({});
   const flattened = useMemo(() => flattenFeatures(FEATURES), []);
+  const selectableFeatures = useMemo(
+    () => flattened.filter((feature) => !Array.isArray(feature.children) || feature.children.length === 0),
+    [flattened]
+  );
   const featureIndex = useMemo(
-    () => flattened.reduce((acc, feature) => {
+    () => selectableFeatures.reduce((acc, feature) => {
       acc[feature.id] = feature;
       return acc;
     }, {}),
-    [flattened]
+    [selectableFeatures]
   );
-  const activeFeature = featureIndex[activeId] || FEATURES[0];
+  const activeFeature = featureIndex[activeId] || featureIndex[getDefaultActiveId()];
 
   useEffect(() => {
     if (!visible) return;
-    setActiveId((current) => current || FEATURES[0]?.id);
+    setActiveId((current) => (featureIndex[current] ? current : getDefaultActiveId()));
+  }, [visible, featureIndex]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const images = buildGuideImageMap();
+    setGuideImages(images);
+    Object.values(images).forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
   }, [visible]);
 
   return (
@@ -442,13 +315,19 @@ function HelpGuideModal({ visible, onClose }) {
           <div className="help-guide-list">
             {FEATURES.map((feature) => (
               <div key={feature.id} className="help-guide-list-group">
-                <button
-                  type="button"
-                  className={`help-guide-list-item${activeId === feature.id ? ' is-active' : ''}`}
-                  onClick={() => setActiveId(feature.id)}
-                >
-                  {feature.title}
-                </button>
+                {Array.isArray(feature.children) && feature.children.length > 0 ? (
+                  <div className="help-guide-list-item is-parent">
+                    {feature.title}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className={`help-guide-list-item${activeId === feature.id ? ' is-active' : ''}`}
+                    onClick={() => setActiveId(feature.id)}
+                  >
+                    {feature.title}
+                  </button>
+                )}
                 {Array.isArray(feature.children) ? (
                   <div className="help-guide-sublist">
                     {feature.children.map((child) => (
@@ -477,18 +356,9 @@ function HelpGuideModal({ visible, onClose }) {
                 <Typography.Paragraph style={{ marginBottom: 0 }}>
                   {activeFeature?.summary}
                 </Typography.Paragraph>
-                {Array.isArray(activeFeature?.children) && activeFeature.children.length > 0 ? (
-                  <Space wrap>
-                    {activeFeature.children.map((child) => (
-                      <Button key={child.id} onClick={() => setActiveId(child.id)}>
-                        {child.title}
-                      </Button>
-                    ))}
-                  </Space>
-                ) : null}
               </Space>
               <div className="help-guide-graph-wrapper">
-                <MiniShowcaseGraph feature={activeFeature} />
+                <GuideImage title={activeFeature?.title} guideImages={guideImages} />
               </div>
             </Card>
             <Card title="How to use it" className="help-guide-usage-card">

@@ -9,7 +9,8 @@ const TerserWebpackPlugin = require('terser-webpack-plugin');
 const Dotenv = require('dotenv-webpack');
 
 const commonPaths = require('./common-paths');
-const PUBLIC_URL = process.env.PUBLIC_URL || require('../package.json').homepage || '';
+const rawPublicUrl = process.env.PUBLIC_URL || require('../package.json').homepage || '';
+const PUBLIC_URL = rawPublicUrl === '.' ? './' : rawPublicUrl;
 
 const config = {
   output: {

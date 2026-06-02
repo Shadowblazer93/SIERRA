@@ -19,6 +19,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { StreamLanguage } from '@codemirror/stream-parser';
 import { EditorView } from '@codemirror/view';
 import { cypher } from '@codemirror/legacy-modes/mode/cypher';
+import { lineNumbers } from '@codemirror/gutter';
 import ReactFlow, { ReactFlowProvider, Background, Handle } from 'react-flow-renderer';
 import { PRED_COLOR_V2, OPERATORS, ENABLE_DNF_BUILDER } from '../../constants';
 import { Context } from '../../Store';
@@ -1882,6 +1883,32 @@ const NodePredicateModal = ({
           width={580}
         >
           <div onMouseDown={(e) => e.stopPropagation()}>
+            <div
+              style={{
+                marginBottom: 14,
+                border: '1px solid #e5e5e5',
+                borderRadius: 8,
+                background: '#fafafa',
+                padding: 10,
+                maxWidth: '100%',
+                boxSizing: 'border-box',
+                overflow: 'hidden'
+              }}
+            >
+              <div style={{ fontSize: 11, color: '#595959', textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>
+                Live Query Preview
+              </div>
+              <CodeMirror
+                value={previewQueryText}
+                height="120px"
+                extensions={[StreamLanguage.define(cypher), EditorView.lineWrapping]}
+                readOnly
+                style={{ maxWidth: '100%' }}
+                theme={EditorView.theme({
+                  '.cm-gutters': { display: 'none' }
+                })}
+              />
+            </div>
             <div style={{ padding: '0 4px 12px' }}>
             <div
               style={{
@@ -2165,29 +2192,7 @@ const NodePredicateModal = ({
               </div>
             </div>
 
-            <div
-              style={{
-                marginTop: 14,
-                border: '1px solid #e5e5e5',
-                borderRadius: 8,
-                background: '#fafafa',
-                padding: 10,
-                maxWidth: '100%',
-                boxSizing: 'border-box',
-                overflow: 'hidden'
-              }}
-            >
-              <div style={{ fontSize: 11, color: '#595959', textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>
-                Live Query Preview
-              </div>
-              <CodeMirror
-                value={previewQueryText}
-                height="120px"
-                extensions={[StreamLanguage.define(cypher), EditorView.lineWrapping]}
-                readOnly
-                style={{ maxWidth: '100%' }}
-              />
-            </div>
+
           </div>
           </div>
         </Drawer>

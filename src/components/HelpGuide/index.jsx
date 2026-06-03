@@ -19,9 +19,9 @@ const FEATURES = [
     title: 'Basic Pattern Matching',
     summary: 'Build simple node and relationship patterns that translate directly into Cypher MATCH clauses.',
     usage: [
-      'Add nodes and connect them with edges to form a pattern.',
-      'Toggle bold nodes to include them in the RETURN clause.',
-      'Use labels to target specific database entities.'
+      'Click on a node to change its properties',
+      'Click on properties, choose the operator and value for predicates',
+      'Double click a node to exclude it from the return statement'
     ],
     showcaseKey: 'Basic Pattern Matching'
   },
@@ -41,9 +41,9 @@ const FEATURES = [
         title: 'Edge Links',
         summary: 'Define the connections between nodes with directed or undirected links.',
         usage: [
-          'Draw an edge between two nodes.',
-          'Select the relationship type and direction.',
-          'Use the edge modal to refine details.'
+          'Drag from a node\'s dot to another to form a relationship',
+          'Click on the new line to access the relationship sidebar',
+          'Select the relationship type and direction',
         ],
         showcaseKey: 'Edge Links'
       },
@@ -52,9 +52,9 @@ const FEATURES = [
         title: 'Path Length',
         summary: 'Specify exact or ranged hop counts for relationships.',
         usage: [
-          'Open the edge modal and set min/max hops.',
-          'Use exact values for fixed path lengths.',
-          'Combine with predicates for advanced filtering.'
+          'Open the relationship sidebar and set min/max hops',
+          'Use exact values for fixed path lengths',
+          'Use range mode to return queries with variable length'
         ],
         showcaseKey: 'Path Length'
       },
@@ -63,9 +63,9 @@ const FEATURES = [
         title: 'Relationship Properties',
         summary: 'Filter relationships by their properties and metadata.',
         usage: [
-          'Add predicates on relationships.',
-          'Use property filters to narrow matches.',
-          'Combine relationship properties with node predicates.'
+          'Click "Relationship Properties" button in the relationship sidebar',
+          'Add new relationship properties from the available ones',
+          'Set operator, value and optionally property bubble colour'
         ],
         showcaseKey: 'Relationship Properties'
       }
@@ -87,9 +87,9 @@ const FEATURES = [
         title: 'Simple Aggregation',
         summary: 'Add a quick COUNT, SUM, AVG, MIN, or MAX without extra conditions.',
         usage: [
-          'Open a node and pick an aggregation function.',
-          'Leave the condition empty to keep it simple.',
-          'Add multiple aggregations to return more metrics.'
+          'Open a node\'s sidebar and pick an aggregation function.',
+          'Optionally, add an alias to be used in the cypher query',
+          'Add properties in the GROUP BY section'
         ],
         showcaseKey: 'Simple Aggregation'
       },
@@ -98,9 +98,9 @@ const FEATURES = [
         title: 'Pipeline Aggregation',
         summary: 'Filter aggregation results with HAVING-style conditions.',
         usage: [
-          'Add an aggregation with a condition (operator + value).',
-          'Use aliases for clearer HAVING rules.',
-          'Combine multiple conditional aggregations in one query.'
+          'Add an aggregation and click the filter icon to switch to pipeline mode',
+          'Add a condition for the aggregation by choosing operator + value for comparison',
+          'Use aliases for clearer HAVING rules'
         ],
         showcaseKey: 'Pipeline Aggregation'
       }
@@ -122,9 +122,9 @@ const FEATURES = [
         title: 'Equi Join',
         summary: 'Match attributes with equality for exact joins.',
         usage: [
-          'Create predicates on two nodes.',
-          'Select Equi join to compare with =.',
-          'Use for exact key-to-key matches.'
+          'Add two predicates with matching value types',
+          'Select "JOIN" operation in the toolbar, then drag and drop two predicates together',
+          'View the Join View Box to see if there are any errors in the join'
         ],
         showcaseKey: 'Equi Join'
       },
@@ -133,9 +133,9 @@ const FEATURES = [
         title: 'Theta Join',
         summary: 'Compare attributes with operators like >, <, or >=.',
         usage: [
-          'Create predicates on two nodes.',
-          'Select Theta join to choose the operator.',
-          'Use for range-based or inequality matches.'
+          'Add two predicates with matching value types',
+          'Select "JOIN" operation in the toolbar, then drag and drop two predicates together',
+          'Click on the join and change the join type to "Theta Join". Select operator'
         ],
         showcaseKey: 'Theta Join'
       }
@@ -146,9 +146,9 @@ const FEATURES = [
     title: 'OR Links',
     summary: 'Combine predicates with OR logic using visual links and grouping.',
     usage: [
-      'Select predicates and connect them with OR links.',
-      'Review the OR grouping halo around predicates.',
-      'Mix OR with AND to build complex boolean filters.'
+      'Select "OR Link" operation in the toolbar. Drag and drop two predicates to "OR" them',
+      'Hover over the group of predicates to bring up the OR menu',
+      'In the OR menu, you can choose which predicates to remove from the OR group'
     ],
     showcaseKey: 'OR Links'
   },
@@ -168,9 +168,10 @@ const FEATURES = [
         title: 'Change Nesting',
         summary: 'Rearrange predicate groups to change boolean structure without rebuilding them.',
         usage: [
-          'Open the predicate modal and select Change Nesting.',
-          'Move predicates between groups to reshape logic.',
-          'Confirm the updated grouping before closing.'
+          'Open a node\'s sidebar and select "Change Nesting"',
+          'Click on the operators to toggle them, use the indent and outdent buttons to change nesting',
+          'Drag and drop the capsules to re-order predicates in the formed query',
+          'View the Live Query Preview at the bottom of the page to verify correctness'
         ],
         showcaseKey: 'Change Nesting'
       },
@@ -179,9 +180,10 @@ const FEATURES = [
         title: 'Expression Tree',
         summary: 'Visualize predicate logic as an expression tree to understand grouping and precedence.',
         usage: [
-          'Open the predicate modal to view the expression tree.',
-          'Expand groups to inspect nested boolean structure.',
-          'Use the tree to verify how predicates combine.'
+          'Open a node\'s sidebar and select "Change Nesting"',
+          'Click on the operators to toggle them, use the indent and outdent buttons to change nesting',
+          'Drag and drop the capsules to re-order predicates in the formed query',
+          'TIP: you can do mass nesting by using the operator nesting buttons to nest everything under it'
         ],
         showcaseKey: 'Expression Tree'
       }
@@ -203,9 +205,9 @@ const FEATURES = [
         title: 'Query Controls',
         summary: 'Access the primary actions for running, saving, and clearing queries.',
         usage: [
-          'Use the Run button to execute the query.',
-          'Reset to clear the current graph.',
-          'Open additional actions from the controls bar.'
+          'Click on the query controls button (pencil icon) in the toolbar',
+          'Click "+" to add new RETURN, WITH, ORDER BY clauses',
+          'Edit query parameters then save changes by pressing "Update Query"'
         ],
         showcaseKey: 'Query Controls'
       },
@@ -214,9 +216,9 @@ const FEATURES = [
         title: 'Clipboard',
         summary: 'Copy, review, and reuse generated Cypher queries.',
         usage: [
-          'Open the clipboard panel to view saved queries.',
-          'Copy a query with one click.',
-          'Paste into your editor or reuse later.'
+          'Click on the clipboard button in the toolbar',
+          'View history as well as saved queries. Click star to save a query',
+          'Click the restore button on a query to bring it back into the graph'
         ],
         showcaseKey: 'Clipboard'
       },
@@ -225,9 +227,9 @@ const FEATURES = [
         title: 'Join View Box',
         summary: 'Inspect join relationships and predicate link details.',
         usage: [
-          'Open the join view to see active joins.',
-          'Review join operators and matched fields.',
-          'Use it to validate complex join logic.'
+          'Click on the Join View button to see active joins in a mini-graph',
+          'Hover over warnings or errors to view reasons for incorrect joins',
+          'Click the list button to see, modify and remove all active joins'
         ],
         showcaseKey: 'Join View Box'
       }

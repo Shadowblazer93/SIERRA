@@ -1,6 +1,6 @@
 import React from 'react';
 import { Drawer, Tabs, Empty, Button, Typography } from 'antd';
-import { StarOutlined, StarFilled, CopyOutlined, DeleteOutlined } from '@ant-design/icons';
+import { StarOutlined, StarFilled, RetweetOutlined, DeleteOutlined } from '@ant-design/icons';
 import CodeMirror from '@uiw/react-codemirror';
 import { StreamLanguage } from '@codemirror/stream-parser';
 import { cypher } from '@codemirror/legacy-modes/mode/cypher';
@@ -36,7 +36,7 @@ function QueryCard({ item, onToggleStar, onRestore, onDelete }) {
             type="text"
             size="small"
             className="query-clipboard-copy-button"
-            icon={<CopyOutlined />}
+            icon={<RetweetOutlined />}
             onClick={() => onRestore(item.query)}
           />
           <Button

@@ -1230,8 +1230,9 @@ ul li::marker {
 
 .help-guide-usage-card .help-guide-details-list {
   padding-left: 16px;
-  margin: 0;
   line-height: 1.5;
+  font-size: 15px;
+  margin-top: -15px;
 }
 
 @media (max-width: 960px) {

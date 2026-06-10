@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Button, Form, Input, Switch, Select, Space, Typography, Divider, Row, Col, Modal, message } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined, RetweetOutlined, PlusOutlined, DeleteOutlined, DragOutlined, EyeInvisibleOutlined, UserOutlined, CheckCircleFilled } from '@ant-design/icons';
+import { ArrowUpOutlined, ArrowDownOutlined, RetweetOutlined, PlusOutlined, DeleteOutlined, DragOutlined, EyeInvisibleOutlined, UserOutlined, CheckCircleFilled, PlayCircleOutlined, QuestionCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { supabase } from '../../supabaseClient';
 import './index.css';
 
@@ -21,7 +21,8 @@ const QueryControls = forwardRef(({
   onToggleDarkMode,
   darkThemePreset,
   onThemePresetChange,
-  themePresets
+  themePresets,
+  onOpenHelpGuide
 }, ref) => {
   const [limit, setLimit] = useState(options.limit || '');
   const [skip, setSkip] = useState(options.skip || '');
@@ -31,7 +32,7 @@ const QueryControls = forwardRef(({
   const containerRef = useRef(null);
   
   // Dragging State
-  const [position, setPosition] = useState({ x: 45, y: window.innerHeight - 340 });
+  const [position, setPosition] = useState({ x: 50, y: 10 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [visible, setVisible] = useState(false);
@@ -157,7 +158,7 @@ const QueryControls = forwardRef(({
       if (!isDragging) return;
       setPosition(clampPosition({
         x: e.clientX - dragOffset.x,
-        y: e.clientY - dragOffset.y
+        y: dragOffset.y - e.clientY
       }));
     };
 
@@ -195,7 +196,7 @@ const QueryControls = forwardRef(({
     setIsDragging(true);
     setDragOffset({
       x: e.clientX - position.x,
-      y: e.clientY - position.y
+      y: e.clientY + position.y
     });
   };
 
@@ -315,8 +316,43 @@ const QueryControls = forwardRef(({
               visible={settingsVisible}
               onCancel={() => setSettingsVisible(false)}
               footer={null}
+              centered
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: -15 }}>
+                {/* <Text strong style={{fontSize:18, color:'#606060'}}>Help</Text> */}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Button
+                    type="default"
+                    icon={<QuestionCircleOutlined style={{ display: 'flex', alignItems: 'center' }} />}
+                    style={{ background: '#1890ff', color: 'white', flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                    onClick={() => {
+                      if (onOpenHelpGuide) onOpenHelpGuide();
+                      setSettingsVisible(false);
+                    }}
+                  >
+                    Guide
+                  </Button>
+                  <Button
+                    type="default"
+                    icon={<InfoCircleOutlined style={{ display: 'flex', alignItems: 'center' }} />}
+                    style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                    onClick={() => {
+                      setLegendVisible(true);
+                      setSettingsVisible(false);
+                    }}
+                  >
+                    Info
+                  </Button>
+                  <Button
+                    type="default"
+                    icon={<PlayCircleOutlined style={{ display: 'flex', alignItems: 'center' }} />}
+                    style={{ background: '#cc181e', color: 'white',flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                    onClick={() => window.open('https://youtu.be/oqaR1wn9LQk?si=5FXNKCol68-TCjBI', '_blank')}
+                  >
+                    Demo Video
+                  </Button>
+                </div>
+                <Divider style={{ margin: '0' }} />
                 <Text strong style={{fontSize:18, color:'#606060'}}>Website</Text>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -348,7 +384,7 @@ const QueryControls = forwardRef(({
                     ))}
                   </Select>
                 </div>
-                <Divider style={{ margin: '4px 0' }} />
+                <Divider style={{ margin: '0' }} />
                 <Text strong style={{fontSize:18, color:'#606060'}}>Graph</Text>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -391,7 +427,7 @@ const QueryControls = forwardRef(({
                     <Option value="concentric-circles">Concentric circles</Option>
                   </Select>
                 </div>
-                <Divider style={{ margin: '4px 0' }} />
+                <Divider style={{ margin: '0' }} />
                 <Text strong style={{fontSize:18, color:'#606060'}}>Account</Text>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <UserOutlined style={{ color: '#6b7280' }} />
@@ -544,9 +580,9 @@ const QueryControls = forwardRef(({
       ref={containerRef}
         style={{ 
             left: position.x, 
-            top: position.y,
-            right: 'auto', // Override CSS
-            bottom: 'auto'  // Override CSS if set
+            bottom: position.y,
+            right: 'auto',
+            top: 'auto'
         }}
     >
       <div 
@@ -672,6 +708,8 @@ const QueryControls = forwardRef(({
                 </Col>
             </Row>
         ))}
+
+        <Divider style={{ margin: '4px 0' }} />
 
         <Row gutter={8} align="middle">
              <Col span={8}><Text>SKIP</Text></Col>

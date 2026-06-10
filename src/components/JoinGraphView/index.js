@@ -643,7 +643,7 @@ const JoinGraphView = ({ onEditLink }) => {
       {showJoinView && (
         <div 
           className="join-graph-container"
-          style={{ width: dimensions.width, height: dimensions.height }}
+          style={{ width: dimensions.width, height: dimensions.height - 40 }}
         >
           <div className="join-graph-header" style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
             <Title level={5} style={{ margin: '0 0 0 16px' }}>Join View</Title>

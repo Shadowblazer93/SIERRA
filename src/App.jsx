@@ -1306,7 +1306,23 @@ function App() {
                   onClick={() => queryControlsRef.current?.openSettings()}
                 />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 12 }}>
+              <div style={{
+                position: 'fixed',
+                right: 32,
+                bottom: 18,
+                zIndex: 30,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}>
+                <Button
+                  type="default"
+                  shape="circle"
+                  icon={<BuildOutlined />}
+                  size="small"
+                  onClick={handleSaveShowcase}
+                  disabled={state.nodes.length === 0}
+                />
                 <Button
                   type="default"
                   shape="default"
@@ -1322,20 +1338,6 @@ function App() {
                   onClick={() => setHelpGuideVisible(true)}
                 />
               </div>
-              <Button
-                type="default"
-                shape="circle"
-                icon={<BuildOutlined />}
-                size="small"
-                onClick={handleSaveShowcase}
-                disabled={state.nodes.length === 0}
-                style={{
-                  position: 'fixed',
-                  right: 18,
-                  bottom: 18,
-                  zIndex: 30
-                }}
-              />
               <Button
                 style={{
                   width: 120,
@@ -1412,6 +1414,7 @@ function App() {
                 dispatch({ type: 'RESET_DNF_HOVER' });
               }
             }}
+            onOpenHelpGuide={() => setHelpGuideVisible(true)}
             dnfAndGroupingEnabled={state.dnfAndGroupingEnabled}
             onToggleDnfAndGrouping={(enabled) => {
               dispatch({ type: 'SET_DNF_AND_GROUPING', payload: enabled });

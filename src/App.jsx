@@ -324,6 +324,55 @@ function App() {
     return buildOrGroupRoots(state.nodes, state.orLinks);
   }, [state.nodes, state.orLinks]);
 
+  // Compute which nodes are referenced by query control RETURN/ORDER BY items
+  const queryControlMap = useMemo(() => {
+    if (!state.nodes || state.nodes.length === 0) return {};
+
+    const returnItems = (queryOptions.returnClause || '')
+      .split(',')
+      .map(item => item.trim())
+      .filter(item => item.length > 0);
+
+    const orderByItems = (queryOptions.orderBys || [])
+      .filter(o => o.field && o.field.trim());
+
+    const map = {};
+
+    state.nodes.forEach(node => {
+      const rep = node.data?.rep;
+      if (!rep) return;
+
+      const returns = [];
+      const orders = [];
+
+      const repPattern = new RegExp(`^${rep}\\.(.+)$`);
+
+      returnItems.forEach(field => {
+        const match = field.match(repPattern);
+        if (match) {
+          returns.push({ property: match[1], full: field });
+        }
+      });
+
+      orderByItems.forEach(order => {
+        const match = order.field.match(repPattern);
+        if (match) {
+          orders.push({
+            property: match[1],
+            full: order.field,
+            direction: order.direction || 'ASC'
+          });
+        }
+      });
+
+      if (returns.length > 0 || orders.length > 0) {
+        map[node.id] = { returns, orders };
+      }
+    });
+
+    return map;
+  }, [queryOptions, state.nodes]);
+
   const getOrGroupPredicateKeys = (groupId) => {
     if (!groupId) return [];
     return Object.keys(orGroupRoots).filter((key) => orGroupRoots[key] === groupId);
@@ -632,8 +681,32 @@ function App() {
 
     if(state.nodes && state.nodes.length > 0){
       let query = api.convertToQuery(state)
-      
-      // Apply Query Options
+
+      // Build WITH clause string (needs to be inserted before RETURN)
+      let withClauseStr = '';
+      if (queryOptions.withClauses && queryOptions.withClauses.length > 0) {
+          const withs = queryOptions.withClauses
+            .filter(w => w.expression)
+            .map(w => w.alias ? `${w.expression} AS ${w.alias}` : w.expression)
+            .join(', ');
+          if (withs) {
+              withClauseStr = `\nWITH ${withs}`;
+          }
+      }
+
+      // Insert WITH before RETURN if both exist
+      if (withClauseStr) {
+        const lastReturnIndex = query.lastIndexOf('\nRETURN');
+        if (lastReturnIndex !== -1) {
+          query = query.substring(0, lastReturnIndex) + withClauseStr + query.substring(lastReturnIndex);
+        } else {
+          // No existing RETURN; query controls may add one below
+          // Append WITH for now; RETURN will follow
+          query += withClauseStr;
+        }
+      }
+
+      // Apply Query Options - RETURN
       if (queryOptions.returnClause) {
         const lastReturnIndex = query.lastIndexOf('RETURN');
         if (lastReturnIndex !== -1) {
@@ -670,17 +743,6 @@ function App() {
                   const post = query.substring(lastReturnIndex + 6); 
                   query = pre + 'RETURN DISTINCT' + post;
             }
-          }
-      }
-
-      if (queryOptions.withClauses && queryOptions.withClauses.length > 0) {
-          const withs = queryOptions.withClauses
-            .filter(w => w.expression)
-            .map(w => w.alias ? `${w.expression} AS ${w.alias}` : w.expression)
-            .join(', ');
-          
-          if (withs) {
-              query += `\nWITH ${withs}`;
           }
       }
 
@@ -1394,7 +1456,8 @@ function App() {
                       onOrGroupOpen: handleOrGroupOpen,
                       onOrGroupHoverStart: handleOrGroupHoverStart,
                       onOrGroupHoverEnd: handleOrGroupHoverEnd,
-                      hoveredOrGroupId
+                      hoveredOrGroupId,
+                      queryControls: queryControlMap[n.id] || null
                     }
                   })
                 ).concat(andLinkElements).concat(

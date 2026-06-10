@@ -13,6 +13,7 @@ import NodePredicateModal from './NodePredicateModal';
 import { set } from 'lodash';
 import useVisualActions from '../hooks/useVisualActions';
 import { Tooltip } from 'antd';
+import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import joinIcon from '../assets/images/join_icon.png';
 import { buildOrGroupRoots } from '../utils/orGroupRoots';
 
@@ -276,6 +277,66 @@ function Node(props) {
       };
     });
   }, [pipelineAggregations, predicates, displayRadius, props.id]);
+
+  // Query control bubbles (RETURN / ORDER BY) positioned like simple aggregations
+  const queryControlBubbles = useMemo(() => {
+    const qc = props.data?.queryControls;
+    if (!qc) return [];
+    
+    const allItems = [];
+    
+    // Add RETURN items
+    (qc.returns || []).forEach((item) => {
+      allItems.push({
+        type: 'return',
+        property: item.property,
+        full: item.full
+      });
+    });
+    
+    // Add ORDER BY items
+    (qc.orders || []).forEach((item) => {
+      allItems.push({
+        type: 'order',
+        property: item.property,
+        full: item.full,
+        direction: item.direction
+      });
+    });
+    
+    if (allItems.length === 0) return [];
+    
+    const total = allItems.length;
+    const bubbleSize = total >= 10 ? 9 : (total >= 6 ? 10 : 11);
+    // Place query control bubbles slightly outside the aggregation ring
+    const ringRadius = displayRadius - 18;
+    const startAngle = Math.PI / 2; // Start from the bottom
+    const pixelGap = 2;
+    const baseStep = (bubbleSize + pixelGap) / Math.max(ringRadius, 1);
+    // Restrict span to bottom half so bubbles stay on the bottom and grow both left and right
+    const maxSpan = Math.PI - baseStep;
+    const requestedSpan = baseStep * Math.max(total - 1, 0);
+    const packedStep = total > 1
+      ? (requestedSpan > maxSpan ? maxSpan / (total - 1) : baseStep)
+      : 0;
+    
+    return allItems.map((item, index) => {
+      // Spread symmetrically from bottom center: leftmost first, rightmost last
+      const offset = (index - (total - 1) / 2) * packedStep;
+      const angle = startAngle + offset;
+      const centerX = displayRadius + ringRadius * Math.cos(angle);
+      const centerY = displayRadius + ringRadius * Math.sin(angle);
+      
+      return {
+        key: `qc-bubble-${props.id}-${index}`,
+        item,
+        index,
+        x: centerX - bubbleSize / 2,
+        y: centerY - bubbleSize / 2,
+        size: bubbleSize
+      };
+    });
+  }, [props.data?.queryControls, displayRadius, props.id]);
 
   const orGroupRoots = useMemo(() => {
     if (props.data?.orGroupRoots && typeof props.data.orGroupRoots === 'object') {
@@ -773,6 +834,73 @@ function Node(props) {
                     pointerEvents: 'none'
                   }}
                 />
+              </div>
+            </Tooltip>
+          );
+        })}
+
+        {/* Query Control Bubbles (RETURN / ORDER BY) */}
+        {queryControlBubbles.map((bubble) => {
+          const isReturn = bubble.item.type === 'return';
+          const isAsc = !isReturn && bubble.item.direction === 'ASC';
+          const isDesc = !isReturn && bubble.item.direction === 'DESC';
+          const tooltipTitle = isReturn
+            ? `RETURN ${bubble.item.full}`
+            : `ORDER BY ${bubble.item.full} ${bubble.item.direction}`;
+
+          // RETURN = node color (lightened), ORDER BY ASC = red, ORDER BY DESC = blue
+          const nodeColor = props.data.color;
+          const theme = isReturn
+            ? { border: '1px solid rgba(0,0,0,0.35)', bg: `linear-gradient(rgba(255,255,255,0.5), rgba(255,255,255,0.5)), ${nodeColor}`, fg: '#555' }
+            : isAsc
+            ? { border: '1px solid rgba(245, 34, 45, 0.6)', bg: '#fff1f0', fg: '#f5222d' }
+            : { border: '1px solid rgba(24, 144, 255, 0.6)', bg: '#e6f7ff', fg: '#1890ff' };
+
+          return (
+            <Tooltip
+              key={bubble.key}
+              title={
+                <div style={{ maxWidth: 280 }}>
+                  <div style={{ fontSize: 12, lineHeight: 1.4 }}>
+                    {tooltipTitle}
+                  </div>
+                </div>
+              }
+              placement="top"
+              overlayStyle={{ zIndex: 9999, maxWidth: 300 }}
+              mouseEnterDelay={0}
+              mouseLeaveDelay={0.05}
+              destroyTooltipOnHide
+              getPopupContainer={() => document.body}
+            >
+              <div
+                onMouseDown={(event) => event.stopPropagation()}
+                onMouseUp={(event) => event.stopPropagation()}
+                onClick={(event) => event.stopPropagation()}
+                style={{
+                  position: 'absolute',
+                  left: bubble.x,
+                  top: bubble.y,
+                  width: bubble.size,
+                  height: bubble.size,
+                  borderRadius: '50%',
+                  border: theme.border,
+                  background: theme.bg,
+                  color: theme.fg,
+                  fontSize: 7,
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+                  cursor: 'help',
+                  zIndex: 30,
+                  lineHeight: 1
+                }}
+              >
+                {isAsc && <ArrowUpOutlined style={{ fontSize: 8 }} />}
+                {isDesc && <ArrowDownOutlined style={{ fontSize: 8 }} />}
+                {/* RETURN bubbles have no icon */}
               </div>
             </Tooltip>
           );

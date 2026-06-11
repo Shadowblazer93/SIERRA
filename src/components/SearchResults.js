@@ -63,7 +63,10 @@ function SearchResults(props) {
 
     const firstRecord = props.result[0];
     const headers = firstRecord._fields.map((val, index) => {
-      if (val && val.labels) return val.labels;
+      if (val && val.labels) {
+        const varName = firstRecord.keys[index];
+        return `${val.labels.join(', ')} (${varName})`;
+      }
       if (val && val.segments) return 'Path';
       return firstRecord.keys[index];
     });
@@ -146,7 +149,8 @@ function SearchResults(props) {
                   {props.result[0]._fields.map(function (val, index) {
                     let headerText = "";
                     if (val && val.labels) {
-                      headerText = val.labels;
+                      const varName = props.result[0].keys[index];
+                      headerText = `${val.labels.join(', ')} (${varName})`;
                     } else if (val && val.segments) {
                       headerText = "Path";
                     } else {

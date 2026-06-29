@@ -1,16 +1,34 @@
 # SIERRA: A Visual Graph Query Interface for property graphs
 
-- Try SIERRA : https://Shadowblazer93.github.io/SIERRA
+Try SIERRA : https://Shadowblazer93.github.io/SIERRA
 
-- SIERRA Demo Video : https://youtu.be/oqaR1wn9LQk
+SIERRA Demo Video : https://youtu.be/oqaR1wn9LQk
 
 ## Running the Project
+
+Make sure Node v16 is installed on your system
 
 ```sh
 $ npm run start
 ```
 
 The application will start running at http://localhost:3000/.
+
+## Running with Docker
+
+Build the Docker image:
+
+```sh
+$ docker build -t sierra -f dockerfile .
+```
+
+Run the container:
+
+```sh
+$ docker run -p 3000:3000 sierra
+```
+
+The application will be available at http://localhost:3000/.
 
 ## Project Structure
 

@@ -33,6 +33,7 @@ import { buildDnfAndLinksFromQuery } from './utils/dnfGraph';
 import { buildOrGroupRoots } from './utils/orGroupRoots';
 import { resetCurAvailId, undoResetNodeId } from './utils/getNodeId';
 import { PRED_COLOR_V2 } from './constants';
+import { APP_CONFIG } from './config';
 import darkreaderThemes from './darkreaderThemes.json';
 const neo4jApi = require('./neo4jApi')
 const pkg = require('../package.json')
@@ -104,6 +105,11 @@ function App() {
   const [hasSession, setHasSession] = useState(false);
   const [pageStatus, setPageStatus] = useState('LOADING');
     useEffect(() => {
+      if (!APP_CONFIG.AUTH_ENABLED) {
+        setSessionReady(true);
+        return;
+      }
+
       let isMounted = true;
 
       const initSession = async () => {
@@ -142,6 +148,7 @@ function App() {
     };
 
     useEffect(() => {
+      if (!APP_CONFIG.AUTH_ENABLED) return;
       if (!sessionReady) return;
       if (isResetPasswordRoute) return undefined;
       if (!hasSession && !isAuthRoute) {
@@ -1215,11 +1222,11 @@ function App() {
     </div>
   );
 
-  if (isResetPasswordRoute) {
+  if (APP_CONFIG.AUTH_ENABLED && isResetPasswordRoute) {
     return <ResetPasswordPage />;
   }
 
-  if (isAuthRoute) {
+  if (APP_CONFIG.AUTH_ENABLED && isAuthRoute) {
     return <AuthPage />;
   }
 

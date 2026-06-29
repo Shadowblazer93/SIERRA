@@ -2,26 +2,12 @@
 
 - Try SIERRA : https://Shadowblazer93.github.io/SIERRA
 
-- SIERRA 1.3.7 Demo Video : https://youtu.be/ogFBnBrBaP8
+- SIERRA Demo Video : https://youtu.be/oqaR1wn9LQk
 
 ## Running the Project
 
-First, open "C:\Program Files\neo4j-community-4.4.16\conf\neo4j.conf"
-
-- comment on the line "dbms.default_database=neo4j" by adding an #
-- uncomment the line "dbms.default_database=northwind" by deleting the #
-
-Then, run powershell as adminstrator and input
-
 ```sh
-$ neo4j.bat console
-```
-
-Next, open another powershell window and input
-
-```sh
-$ cd D:\\SystemDemos\\SIERRA\\SIERRA-master
-$ npm start
+$ npm run start
 ```
 
 The application will start running at http://localhost:3000/.

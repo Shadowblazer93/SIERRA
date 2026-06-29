@@ -1,10 +1,19 @@
 import React from 'react';
-import { getBezierPath } from 'react-flow-renderer';
 
 function PredicateLinkEdge({ id, sourceX, sourceY, targetX, targetY, data }) {
-  const edgePath = `M ${sourceX}, ${sourceY+7}L ${targetX}, ${targetY+7}`
+  const startY = sourceY + 7;
+  const endY = targetY + 7;
+  const midX = (sourceX + targetX) / 2;
+  const midY = (startY + endY) / 2;
+  const curveOffset = Math.max(
+    18,
+    Math.min(44, Math.abs(targetX - sourceX) * 0.24 + Math.abs(endY - startY) * 0.18)
+  );
+  const edgePath = `M ${sourceX}, ${startY} Q ${midX}, ${midY - curveOffset} ${targetX}, ${endY}`;
+
+  // Midpoint of the quadratic bezier curve (at t=0.5) for label placement
   const centerX = (sourceX + targetX) / 2;
-  const centerY = (sourceY + 7 + targetY + 7) / 2;
+  const centerY = (startY + endY) / 2 - curveOffset / 2;
 
   const joinType = data?.joinType;
   const operator = data?.operator;
@@ -20,7 +29,7 @@ function PredicateLinkEdge({ id, sourceX, sourceY, targetX, targetY, data }) {
       {/* Invisible wide path for easier clicking */}
       <path
         d={edgePath}
-        style={{ stroke: 'transparent', strokeWidth: 7, cursor: 'pointer' }}
+        style={{ stroke: 'transparent', strokeWidth: 7, cursor: 'pointer', fill: 'none' }}
         onClick={(event) => {
           if (data && data.onLinkClick) {
             data.onLinkClick(event, id);

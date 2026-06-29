@@ -13,7 +13,7 @@ import NodePredicateModal from './NodePredicateModal';
 import { set } from 'lodash';
 import useVisualActions from '../hooks/useVisualActions';
 import { Tooltip } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
+import { ArrowUpOutlined, ArrowDownOutlined, FilterOutlined } from '@ant-design/icons';
 import joinIcon from '../assets/images/join_icon.png';
 import { buildOrGroupRoots } from '../utils/orGroupRoots';
 
@@ -805,35 +805,20 @@ function Node(props) {
                   width: bubbleSize,
                   height: bubbleSize,
                   borderRadius: '50%',
-                  border: '1px solid rgba(0,0,0,0.3)',
-                  background: bubble.color.bg,
-                  color: bubble.color.text,
-                  fontSize: 10,
-                  fontWeight: 700,
+                  border: '1px solid rgba(0,0,0,0.4)',
+                  background: darkenHsl(bubble.color.bg, 10),
+                  color: '#ffffff',
+                  fontSize: 13,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
                   cursor: 'pointer',
                   zIndex: 25,
-                  pointerEvents: 'all',
-                  lineHeight: 1
+                  pointerEvents: 'all'
                 }}
-                >
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: '50%',
-                    top: '50%',
-                    width: Math.round(bubbleSize * 0.65) + 'px',
-                    height: Math.round(bubbleSize * 0.65) + 'px',
-                    borderRadius: '50%',
-                    background: darkenHsl(bubble.color.bg, 10),
-                    boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.04)',
-                    transform: 'translate(-50%, -50%)',
-                    pointerEvents: 'none'
-                  }}
-                />
+              >
+                <FilterOutlined style={{ color: '#ffffff', fontSize: Math.round(bubbleSize * 0.55) }} />
               </div>
             </Tooltip>
           );

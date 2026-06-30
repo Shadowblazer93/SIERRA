@@ -1,0 +1,3 @@
+//! need to check if rs is in the neighbor
+
+//! need to distinguish between node or edgeå

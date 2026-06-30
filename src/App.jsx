@@ -239,6 +239,7 @@ function App() {
         andLinks: state.andLinks,
         predDisplayStatus: state.predDisplayStatus,
         orRepresentation: state.orRepresentation,
+        reducedEdgeCrossing: state.reducedEdgeCrossing,
         dnfMode: state.dnfMode,
         dnfLinksVisible: state.dnfLinksVisible,
         dnfAndGroupingEnabled: state.dnfAndGroupingEnabled,
@@ -1072,9 +1073,11 @@ function App() {
     setJoinModalVisible(true);
   };
 
+  const edgeVersionSuffix = state.reducedEdgeCrossing ? 'rec1' : 'rec0';
+
   const predicateLinkElements = state.predicateLinks.length > 0
     ? state.predicateLinks.map((link, idx) => ({
-        id: `predicate-link-${idx}`,
+        id: `predicate-link-${idx}-${edgeVersionSuffix}`,
         source: link.from.nodeId,
         target: link.to.nodeId,
         sourceHandle: link.from.attr,
@@ -1145,7 +1148,7 @@ function App() {
         const groupId = sourceGroupId || targetGroupId || fromKey;
         const groupColor = getOrGroupColor(groupId);
         return {
-          id: `or-link-${idx}`,
+          id: `or-link-${idx}-${edgeVersionSuffix}`,
           source: link.from.nodeId,
           target: link.to.nodeId,
           sourceHandle: link.from.attr,
@@ -1172,7 +1175,7 @@ function App() {
 
   const andLinkElements = (state.andLinks || []).length > 0
     ? state.andLinks.map((link, idx) => ({
-        id: `and-link-${idx}`,
+        id: `and-link-${idx}-${edgeVersionSuffix}`,
         source: link.from.nodeId,
         target: link.to.nodeId,
         sourceHandle: link.from.attr,
@@ -1414,6 +1417,8 @@ function App() {
             onVisibleChange={setQueryControlsVisible}
             orRepresentation={state.orRepresentation}
             onChangeOrRepresentation={(value) => dispatch({ type: 'SET_OR_REPRESENTATION', payload: value })}
+            reducedEdgeCrossing={state.reducedEdgeCrossing}
+            onChangeReducedEdgeCrossing={(value) => dispatch({ type: 'SET_REDUCED_EDGE_CROSSING', payload: value })}
             dnfLinksVisible={state.dnfLinksVisible}
             onToggleDnfLinks={(visible) => {
               dispatch({ type: 'SET_DNF_LINKS_VISIBLE', payload: visible });

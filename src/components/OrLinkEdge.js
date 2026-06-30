@@ -48,7 +48,8 @@ function OrLinkEdge({ id, sourceX, sourceY, targetX, targetY, data }) {
   const isSunflowerSameGroup = data?.orRepresentation === 'sunflower' && !!data?.isSameGroup;
   const midX = (sourceX + targetX) / 2;
   const midY = (startY + endY) / 2;
-  const curveOffset = Math.max(18, Math.min(44, Math.abs(targetX - sourceX) * 0.24 + Math.abs(endY - startY) * 0.18));
+  const curveMultiplier = state.reducedEdgeCrossing ? 1.5 : 1.0;
+  const curveOffset = Math.max(18, Math.min(44, Math.abs(targetX - sourceX) * 0.24 + Math.abs(endY - startY) * 0.18)) * curveMultiplier;
   const edgePath = isSunflowerSameGroup
     ? `M ${sourceX}, ${startY} Q ${midX}, ${midY - curveOffset} ${targetX}, ${endY}`
     : `M ${sourceX}, ${startY}L ${targetX}, ${endY}`;
@@ -140,9 +141,12 @@ function OrLinkEdge({ id, sourceX, sourceY, targetX, targetY, data }) {
           <stop offset="100%" stopColor={gradientEnd} />
         </linearGradient>
       </defs>
-      <path
-        d={edgePath}
-        style={{ stroke: 'transparent', strokeWidth: 10, cursor: 'default', fill: 'none' }}
+      {/* Compact hover target near the OR label instead of following the full curve */}
+      <circle
+        cx={centerX}
+        cy={centerY - 59}
+        r={22}
+        style={{ fill: 'transparent', cursor: 'default' }}
         onMouseEnter={() => {
           beginHover();
           scheduleDnfHoverStart();
@@ -170,7 +174,7 @@ function OrLinkEdge({ id, sourceX, sourceY, targetX, targetY, data }) {
           width={30}
           height={24}
           x={centerX - 15}
-          y={centerY - 34}
+          y={centerY - 59}
           requiredExtensions="http://www.w3.org/1999/xhtml"
           style={{
             overflow: 'visible',

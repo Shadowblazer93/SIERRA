@@ -104,7 +104,7 @@ const processMatchSubquery = (s, midState, repToElementMap, state) => {
 
   });
 }
-const processWhereSubquery = (s, midState, repToElementMap, state) => {
+const processWhereSubquery = (s, midState, repToElementMap, state, predicateLinks) => {
 
   const op = ['=', '>', '>=', '<', '<=', '<>']
   const clauses = s.split("AND").map(s => s.trim())
@@ -124,8 +124,49 @@ const processWhereSubquery = (s, midState, repToElementMap, state) => {
       }
 
       let [arr1, value] = clause.split(operand)
-      value = value.trim().replace(/^['"]|['"]$/g, '')
+      const rawTrimmed = value.trim()
+      value = rawTrimmed.replace(/^['"]|['"]$/g, '')
       const [rep, property] = arr1.split(".").map((s) => s.trim())
+
+      //* Check for cross-node join: a.x = b.y (where b is a known node rep)
+      const joinMatch = rawTrimmed.match(/^([a-zA-Z_]\w*)\.([a-zA-Z_]\w*)$/);
+      if (joinMatch && joinMatch[1] in midState.nodes && rep in midState.nodes && joinMatch[1] !== rep) {
+        const valueRep = joinMatch[1];
+        const valueProperty = joinMatch[2];
+
+        // Validate both properties exist on their respective nodes
+        const fromLabel = midState.nodes[rep].label;
+        if (state.props[fromLabel].indexOf(property) === -1) {
+          throw `no such property in node ${fromLabel}`;
+        }
+        const toLabel = midState.nodes[valueRep].label;
+        if (state.props[toLabel].indexOf(valueProperty) === -1) {
+          throw `no such property in node ${toLabel}`;
+        }
+
+        // Create empty predicates on both sides so predicate circles appear in the graph
+        const fromNode = midState.nodes[rep];
+        const toNode = midState.nodes[valueRep];
+        const opIndex = op.indexOf(operand);
+
+        if (!fromNode.predicates) fromNode.predicates = {};
+        if (!fromNode.predicates[property]) fromNode.predicates[property] = [];
+        fromNode.predicates[property].push([opIndex, '']);
+
+        if (!toNode.predicates) toNode.predicates = {};
+        if (!toNode.predicates[valueProperty]) toNode.predicates[valueProperty] = [];
+        toNode.predicates[valueProperty].push([opIndex, '']);
+
+        // Add predicate link for the join
+        predicateLinks.push({
+          from: { nodeId: fromNode.nodeId, attr: property },
+          to: { nodeId: toNode.nodeId, attr: valueProperty },
+          joinType: operand === '=' ? 'Equi Join' : 'Theta Join',
+          operator: operand
+        });
+
+        continue; // Skip regular predicate creation
+      }
 
       //* check if property is in node
       let obj = repToElementMap[rep]
@@ -178,6 +219,7 @@ export const convertToGraph = (query, state) => {
       nodes:{},
       edges:{}
   }
+  const predicateLinks = [];
   //* remove surrounding whitespaces
   let queryCopy = query.trim()
 
@@ -201,7 +243,7 @@ export const convertToGraph = (query, state) => {
       }
       try {
         processMatchSubquery(arr[0].replace("MATCH", "").trim(), midState, repToElementMap, state)
-        processWhereSubquery(arr2[0].trim(), midState, repToElementMap, state)
+        processWhereSubquery(arr2[0].trim(), midState, repToElementMap, state, predicateLinks)
         // processMidState(midState, state)
       } catch (e) {
         throw e
@@ -219,5 +261,5 @@ export const convertToGraph = (query, state) => {
         throw e
       }
   }
-  return midState
+  return { ...midState, predicateLinks }
 }

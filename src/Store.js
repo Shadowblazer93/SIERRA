@@ -18,6 +18,7 @@ export const initialState = {
   dnfMode: false,
   dnfLinksVisible: false,
   dnfAndGroupingEnabled: false,
+  reducedEdgeCrossing: false,
   dnfHovering: false,
   dnfHoverCount: 0
 };

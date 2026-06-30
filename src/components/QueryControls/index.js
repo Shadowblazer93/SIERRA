@@ -12,6 +12,8 @@ const QueryControls = forwardRef(({
   onOptionsChange,
   orRepresentation,
   onChangeOrRepresentation,
+  reducedEdgeCrossing,
+  onChangeReducedEdgeCrossing,
   dnfLinksVisible,
   onToggleDnfLinks,
   dnfAndGroupingEnabled,
@@ -408,6 +410,18 @@ const QueryControls = forwardRef(({
                   <Switch
                     checked={!!dnfAndGroupingEnabled}
                     onChange={(checked) => onToggleDnfAndGrouping && onToggleDnfAndGrouping(checked)}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <Text strong>Reduced Edge Crossing</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Move linked predicates to the top to reduce edge crossing.
+                    </Text>
+                  </div>
+                  <Switch
+                    checked={!!reducedEdgeCrossing}
+                    onChange={(checked) => onChangeReducedEdgeCrossing && onChangeReducedEdgeCrossing(checked)}
                   />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>

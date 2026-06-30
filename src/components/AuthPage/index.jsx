@@ -103,6 +103,7 @@ const buildShowcaseState = (showcase) => {
     andLinks: Array.isArray(graph.andLinks) ? graph.andLinks : [],
     predDisplayStatus: graph.predDisplayStatus || initialState.predDisplayStatus,
     orRepresentation: graph.orRepresentation || initialState.orRepresentation,
+    reducedEdgeCrossing: graph.reducedEdgeCrossing ?? initialState.reducedEdgeCrossing,
     dnfMode: !!graph.dnfMode,
     dnfLinksVisible: !!graph.dnfLinksVisible,
     dnfAndGroupingEnabled: !!graph.dnfAndGroupingEnabled,

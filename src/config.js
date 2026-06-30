@@ -13,5 +13,5 @@ export const APP_CONFIG = {
    * When false, the auth page is skipped and SIERRA opens directly.
    * Default: false (recommended for local hosting).
    */
-  AUTH_ENABLED: false,
+  AUTH_ENABLED: true,
 };

@@ -1,19 +1,25 @@
-import React from 'react';
+import React, { useContext } from 'react';
+import { Context } from '../Store';
 
 function PredicateLinkEdge({ id, sourceX, sourceY, targetX, targetY, data }) {
+  const [state] = useContext(Context);
   const startY = sourceY + 7;
   const endY = targetY + 7;
   const midX = (sourceX + targetX) / 2;
   const midY = (startY + endY) / 2;
-  const curveOffset = Math.max(
-    18,
-    Math.min(44, Math.abs(targetX - sourceX) * 0.24 + Math.abs(endY - startY) * 0.18)
-  );
-  const edgePath = `M ${sourceX}, ${startY} Q ${midX}, ${midY - curveOffset} ${targetX}, ${endY}`;
-
-  // Midpoint of the quadratic bezier curve (at t=0.5) for label placement
   const centerX = (sourceX + targetX) / 2;
-  const centerY = (startY + endY) / 2 - curveOffset / 2;
+
+  let edgePath, labelY;
+  if (state.reducedEdgeCrossing) {
+    // Curved path with 0.5 multiplier — current enhanced behavior
+    const curveOffset = Math.max(18, Math.min(44, Math.abs(targetX - sourceX) * 0.24 + Math.abs(endY - startY) * 0.18)) * 0.5;
+    edgePath = `M ${sourceX}, ${startY} Q ${midX}, ${midY - curveOffset} ${targetX}, ${endY}`;
+    labelY = (startY + endY) / 2 - curveOffset * 0.5;
+  } else {
+    // Straight line — original behavior
+    edgePath = `M ${sourceX}, ${startY}L ${targetX}, ${endY}`;
+    labelY = (startY + endY) / 2;
+  }
 
   const joinType = data?.joinType;
   const operator = data?.operator;
@@ -47,7 +53,7 @@ function PredicateLinkEdge({ id, sourceX, sourceY, targetX, targetY, data }) {
         width={24}
         height={24}
         x={centerX - 12}
-        y={centerY - 12}
+        y={labelY - 12}
         requiredExtensions="http://www.w3.org/1999/xhtml"
         style={{ overflow: 'visible', pointerEvents: 'none' }}
       >

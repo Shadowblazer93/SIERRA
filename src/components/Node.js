@@ -412,6 +412,25 @@ function Node(props) {
       .join('|');
   }, [andGroupsByNode]);
 
+  const crossNodeLinkSignature = useMemo(() => {
+    const crossAttrs = new Set();
+    const crossSources = [
+      ...(state.predicateLinks || []),
+      ...(state.orLinks || [])
+    ];
+    crossSources.forEach(link => {
+      if (!link.from || !link.to) return;
+      if (String(link.from.nodeId) === String(link.to.nodeId)) return;
+      if (String(link.from.nodeId) === String(props.id) && predicates[link.from.attr]) {
+        crossAttrs.add(link.from.attr);
+      }
+      if (String(link.to.nodeId) === String(props.id) && predicates[link.to.attr]) {
+        crossAttrs.add(link.to.attr);
+      }
+    });
+    return Array.from(crossAttrs).sort().join('|');
+  }, [state.predicateLinks, state.orLinks, props.id, predicateKeySignature]);
+
   useEffect(() => {
     if (!nodeRef.current) return;
     updateNodeDimensions([
@@ -421,7 +440,7 @@ function Node(props) {
         forceUpdate: true
       }
     ]);
-  }, [updateNodeDimensions, props.id, predicateKeySignature, orGroupSignature, andGroupSignature, displayRadius]);
+  }, [updateNodeDimensions, props.id, predicateKeySignature, orGroupSignature, andGroupSignature, crossNodeLinkSignature, displayRadius, state.reducedEdgeCrossing]);
 
   useEffect(async () => {
     const propValues = await api.fetchPropertyValues(props.data.label);
@@ -1094,6 +1113,60 @@ function Node(props) {
             });
             groupLayoutsById[group.groupId] = groupLayouts;
           });
+        }
+
+        // --- Cross-node link top shifting (final override) ---
+        // Predicates linked via join (predicateLink) or OR link (orLink) to a predicate
+        // in a different node get shifted to the top arc so link paths avoid relationship
+        // edges and other visual features. Runs after OR/AND group processing so linked
+        // predicates always end up at the top regardless of group positioning.
+        // Only active when "Reduced Edge Crossing" setting is enabled.
+        if (state.reducedEdgeCrossing) {
+          const crossNodeLinkedAttrs = new Set();
+          const crossLinkSources = [
+            ...(state.predicateLinks || []),
+            ...(state.orLinks || [])
+          ];
+          crossLinkSources.forEach(link => {
+            if (!link.from || !link.to) return;
+            const isCrossNode = String(link.from.nodeId) !== String(link.to.nodeId);
+            if (!isCrossNode) return;
+            if (String(link.from.nodeId) === String(props.id) && predicates[link.from.attr]) {
+              crossNodeLinkedAttrs.add(link.from.attr);
+            }
+            if (String(link.to.nodeId) === String(props.id) && predicates[link.to.attr]) {
+              crossNodeLinkedAttrs.add(link.to.attr);
+            }
+          });
+
+          if (crossNodeLinkedAttrs.size > 0) {
+            const linkedList = predicateKeys.filter(attr => crossNodeLinkedAttrs.has(attr));
+
+            // Growing top ring for linked predicates with gaps between each
+            const maxActualRadius = Math.max(...linkedList.map(attr => predicates[attr]?.radius ?? 8));
+            const bubbleDiameter = 2 * maxActualRadius;
+            const topRingRadius = displayRadius; // Place on node boundary
+            const topStartAngle = -Math.PI / 2; // Top center
+            const gap = Math.max(4, Math.round(maxActualRadius * 0.6)); // Gap between adjacent predicate edges
+            const baseStep = (bubbleDiameter + gap) / Math.max(topRingRadius, 1);
+            const maxSpan = Math.min(Math.PI * 0.7, linkedList.length * 0.3 + 0.3);
+            const requestedSpan = baseStep * Math.max(linkedList.length - 1, 0);
+            const packedStep = linkedList.length > 1
+              ? (requestedSpan > maxSpan ? maxSpan / (linkedList.length - 1) : baseStep)
+              : 0;
+
+            linkedList.forEach((attr, index) => {
+              const offset = (index - (linkedList.length - 1) / 2) * packedStep;
+              const angle = topStartAngle + offset;
+              const centerX = displayRadius + topRingRadius * Math.cos(angle);
+              const centerY = displayRadius + topRingRadius * Math.sin(angle);
+              const radius = predicates[attr]?.radius ?? 8;
+              const layout = { radius, centerX, centerY, angle };
+              predicateLayout[attr] = layout;
+              predicateLayoutsByAttr[attr] = [layout];
+              anchorByAttr[attr] = { ...anchorByAttr[attr], centerX, centerY, angle };
+            });
+          }
         }
 
         const duplicateNumberByAttr = {};

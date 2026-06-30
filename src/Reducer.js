@@ -81,7 +81,10 @@ const Reducer = (state, action) => {
       {
         const incomingNodes = action.payload.nodes || [];
         const incomingEdges = action.payload.edges || [];
-        const cleanedLinks = cleanupPredicateLinks(incomingNodes, state.predicateLinks);
+        const incomingPredicateLinks = Object.prototype.hasOwnProperty.call(action.payload, 'predicateLinks')
+          ? action.payload.predicateLinks
+          : state.predicateLinks;
+        const cleanedLinks = cleanupPredicateLinks(incomingNodes, incomingPredicateLinks);
         const cleanedOrLinks = cleanupOrLinks(incomingNodes, state.orLinks);
         const incomingAndLinks = Object.prototype.hasOwnProperty.call(action.payload, 'andLinks')
           ? action.payload.andLinks
@@ -183,6 +186,11 @@ const Reducer = (state, action) => {
       return {
         ...state,
         dnfAndGroupingEnabled: action.payload
+      };
+    case 'SET_REDUCED_EDGE_CROSSING':
+      return {
+        ...state,
+        reducedEdgeCrossing: action.payload
       };
     case 'ADD_OR_LINK': {
       const newLink = action.payload;

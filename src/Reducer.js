@@ -85,7 +85,10 @@ const Reducer = (state, action) => {
           ? action.payload.predicateLinks
           : state.predicateLinks;
         const cleanedLinks = cleanupPredicateLinks(incomingNodes, incomingPredicateLinks);
-        const cleanedOrLinks = cleanupOrLinks(incomingNodes, state.orLinks);
+        const incomingOrLinks = Object.prototype.hasOwnProperty.call(action.payload, 'orLinks')
+          ? action.payload.orLinks
+          : state.orLinks;
+        const cleanedOrLinks = cleanupOrLinks(incomingNodes, incomingOrLinks);
         const incomingAndLinks = Object.prototype.hasOwnProperty.call(action.payload, 'andLinks')
           ? action.payload.andLinks
           : state.andLinks;

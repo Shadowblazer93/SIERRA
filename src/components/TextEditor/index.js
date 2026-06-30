@@ -104,13 +104,14 @@ export default function({text}){
   const handleSearch = () => {
     try {
       resetCurAvailId()
-      let {nodes: midNodes, edges: midEdges, predicateLinks: midPredicateLinks} = convertToGraph(innerText, state)
+      let {nodes: midNodes, edges: midEdges, predicateLinks: midPredicateLinks, orLinks: midOrLinks} = convertToGraph(innerText, state)
       let nodes = []
       let newGraph = {
         ...state,
         nodes: [],
         edges: [],
-        predicateLinks: midPredicateLinks || []
+        predicateLinks: midPredicateLinks || [],
+        orLinks: midOrLinks || []
       }
       const nodePositionMap = {}
       for(const oldNode of cnlNodes) {
@@ -147,6 +148,7 @@ export default function({text}){
           data: {
             connected: n.connected,
             rep: key,
+            predicateNesting: n.predicateNesting
           }
         })
         if(n.predicates) {

@@ -456,17 +456,42 @@ const convertToQuery = (state) => {
     nesting.order.forEach(function (attr) {
       var key = `${node.id}_${attr}`;
       var root = findOR(key) || key;
-      if (emittedGroupRoots[root]) return;
 
-      var expression = groupedExpressionByKey[key] || nodePredQueries[attr];
-      if (!expression) return;
+      // Check if predicates in this OR group have different nesting levels
+      var orGroup = orGroups[root];
+      var hasMixedNestingLevels = false;
+      if (orGroup && orGroup.length > 1) {
+        var levelsInGroup = orGroup.map(function (k) {
+          var kAttr = k.substring(k.indexOf('_') + 1);
+          return nesting.levels[kAttr] || 0;
+        });
+        hasMixedNestingLevels = new Set(levelsInGroup).size > 1;
+      }
 
-      emittedGroupRoots[root] = true;
-      orderedItems.push({
-        expression,
-        level: nesting.levels[attr] || 0,
-        connector: nesting.modes[attr] || 'AND'
-      });
+      if (hasMixedNestingLevels) {
+        // Predicates in this OR group have different nesting levels.
+        // Emit each individually with its level so original parenthesization is preserved.
+        // The OR connector comes from nesting.modes which we set during Cypher parsing.
+        var individualExpr = nodePredQueries[attr];
+        if (!individualExpr) return;
+        orderedItems.push({
+          expression: individualExpr,
+          level: nesting.levels[attr] || 0,
+          connector: nesting.modes[attr] || 'AND'
+        });
+      } else {
+        if (emittedGroupRoots[root]) return;
+
+        var expression = groupedExpressionByKey[key] || nodePredQueries[attr];
+        if (!expression) return;
+
+        emittedGroupRoots[root] = true;
+        orderedItems.push({
+          expression,
+          level: nesting.levels[attr] || 0,
+          connector: nesting.modes[attr] || 'AND'
+        });
+      }
     });
 
     var nodeExpression = buildNestedAndExpression(orderedItems);

@@ -278,6 +278,12 @@ function App() {
     }
   }, [recentDatabases]);
 
+  const [connectModalVisible, setConnectModalVisible] = useState(false);
+  const [connectTabKey, setConnectTabKey] = useState('connect');
+  const [recentDetailsVisible, setRecentDetailsVisible] = useState(false);
+  const [activeRecent, setActiveRecent] = useState(null);
+  const [form] = Form.useForm();
+
   useEffect(() => {
     if (connectModalVisible) {
       setConnectTabKey('connect');
@@ -308,12 +314,6 @@ function App() {
       DarkReader.disable();
     }
   }, [darkModeEnabled, darkThemePreset, shouldEnableDarkMode]);
-
-  const [connectModalVisible, setConnectModalVisible] = useState(false);
-  const [connectTabKey, setConnectTabKey] = useState('connect');
-  const [recentDetailsVisible, setRecentDetailsVisible] = useState(false);
-  const [activeRecent, setActiveRecent] = useState(null);
-  const [form] = Form.useForm();
 
   const getOrGroupColor = (groupId) => {
     if (!groupId) return '#ff8c00';

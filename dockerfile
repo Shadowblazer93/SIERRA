@@ -2,9 +2,9 @@ FROM node:16
 
 WORKDIR /app
 
-COPY package.json /app
+COPY package.json package-lock.json /app/
 
-RUN npm install --force
+RUN npm ci
 
 COPY . /app
 

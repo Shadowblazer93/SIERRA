@@ -12,9 +12,12 @@ import {
   DragOutlined,
   SortAscendingOutlined,
   UpOutlined,
-  DownOutlined
+  DownOutlined,
+  FullscreenOutlined,
+  CompressOutlined
 } from '@ant-design/icons';
 import React, {useState, useContext, useMemo, useEffect, useCallback, useRef} from 'react';
+import ReactDOM from 'react-dom';
 import CodeMirror from '@uiw/react-codemirror';
 import { StreamLanguage } from '@codemirror/stream-parser';
 import { EditorView } from '@codemirror/view';
@@ -937,6 +940,10 @@ const NodePredicateModal = ({
   const [treeDragState, setTreeDragState] = useState({ attr: '', slotId: null, dragStartX: 0, dragStartY: 0, currentX: 0, currentY: 0 });
   const [expressionTreeInstance, setExpressionTreeInstance] = useState(null);
   const expressionTreeContainerRef = useRef(null);
+  const [expressionTreePoppedOut, setExpressionTreePoppedOut] = useState(false);
+  const [popoutDimensions, setPopoutDimensions] = useState({ width: 520, height: 380 });
+  const [popoutPosition, setPopoutPosition] = useState({ x: 100, y: 100 });
+  const popoutRef = useRef(null);
   const [state, dispatch] = useContext(Context);
 
   const currentNode = (state.nodes || []).find((n) => String(n.id) === String(nodeId));
@@ -987,6 +994,62 @@ const NodePredicateModal = ({
     if (typeof expressionTreeInstance.fitView === 'function') {
       expressionTreeInstance.fitView({ padding: 0.25 });
     }
+  };
+
+  const toggleExpressionTreePopout = () => {
+    setExpressionTreePoppedOut(prev => !prev);
+  };
+
+  const handlePopoutResizeMouseDown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = popoutDimensions.width;
+    const startHeight = popoutDimensions.height;
+
+    const onMouseMove = (moveEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const deltaY = moveEvent.clientY - startY;
+      setPopoutDimensions({
+        width: Math.max(300, startWidth + deltaX),
+        height: Math.max(200, startHeight + deltaY)
+      });
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  };
+
+  const handlePopoutDragMouseDown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startPosX = popoutPosition.x;
+    const startPosY = popoutPosition.y;
+
+    const onMouseMove = (moveEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const deltaY = moveEvent.clientY - startY;
+      setPopoutPosition({
+        x: startPosX + deltaX,
+        y: startPosY + deltaY
+      });
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
   };
 
   const persistNestingState = (nextNestingState) => {
@@ -1446,6 +1509,7 @@ const NodePredicateModal = ({
   };
 
   return (
+    <>
       <Drawer
         title={
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -2104,48 +2168,52 @@ const NodePredicateModal = ({
               <div ref={expressionTreeContainerRef} style={{ height: 300, width: '100%', borderRadius: 6, overflow: 'hidden', background: 'linear-gradient(180deg, #fffdfa 0%, #fafafa 100%)', position: 'relative' }}>
                 {expressionTreeGraph.elements.length > 0 ? (
                   <ReactFlowProvider>
-                    <ReactFlow
-                      elements={expressionTreeElements}
-                      nodeTypes={expressionTreeGraph.nodeTypes}
-                      nodesDraggable={false}
-                      nodesConnectable={false}
-                      elementsSelectable={false}
-                      zoomOnScroll
-                      panOnScroll={false}
-                      zoomOnDoubleClick={false}
-                      minZoom={0.45}
-                      maxZoom={1.6}
-                      onLoad={(instance) => {
-                        setExpressionTreeInstance(instance);
-                        instance.fitView({ padding: 0.25 });
-                      }}
-                      style={{ background: 'transparent' }}
-                    >
-                      <Background gap={18} size={1} color="#f0f0f0" />
-                    </ReactFlow>
+                    {!expressionTreePoppedOut && (
+                      <ReactFlow
+                        elements={expressionTreeElements}
+                        nodeTypes={expressionTreeGraph.nodeTypes}
+                        nodesDraggable={false}
+                        nodesConnectable={false}
+                        elementsSelectable={false}
+                        zoomOnScroll
+                        panOnScroll={false}
+                        zoomOnDoubleClick={false}
+                        minZoom={0.45}
+                        maxZoom={1.6}
+                        onLoad={(instance) => {
+                          setExpressionTreeInstance(instance);
+                          instance.fitView({ padding: 0.25 });
+                        }}
+                        style={{ background: 'transparent' }}
+                      >
+                        <Background gap={18} size={1} color="#f0f0f0" />
+                      </ReactFlow>
+                    )}
 
                     {/* Drag-capture overlay: prevents events reaching underlying main graph while dragging */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        left: 0,
-                        top: 0,
-                        width: '100%',
-                        height: '100%',
-                        zIndex: treeDragState.attr ? 60 : -1,
-                        pointerEvents: treeDragState.attr ? 'all' : 'none'
-                      }}
-                      onPointerMove={(e) => {
-                        if (treeDragState.attr) handleExpressionTreePointerMove(e);
-                      }}
-                      onPointerUp={() => {
-                        if (treeDragState.attr) handleExpressionTreePointerUp();
-                      }}
-                      onPointerCancel={() => {
-                        if (treeDragState.attr) handleExpressionTreePointerUp();
-                      }}
-                      onPointerDown={(e) => e.stopPropagation()}
-                    />
+                    {!expressionTreePoppedOut && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          top: 0,
+                          width: '100%',
+                          height: '100%',
+                          zIndex: treeDragState.attr ? 60 : -1,
+                          pointerEvents: treeDragState.attr ? 'all' : 'none'
+                        }}
+                        onPointerMove={(e) => {
+                          if (treeDragState.attr) handleExpressionTreePointerMove(e);
+                        }}
+                        onPointerUp={() => {
+                          if (treeDragState.attr) handleExpressionTreePointerUp();
+                        }}
+                        onPointerCancel={() => {
+                          if (treeDragState.attr) handleExpressionTreePointerUp();
+                        }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      />
+                    )}
 
                     <div
                       style={{
@@ -2158,31 +2226,51 @@ const NodePredicateModal = ({
                         zIndex: 20
                       }}
                     >
-                      <Tooltip title="Zoom in">
+                      {!expressionTreePoppedOut && (
+                        <>
+                          <Tooltip title="Zoom in">
+                            <Button
+                              size="small"
+                              icon={<PlusOutlined />}
+                              onClick={zoomExpressionTreeIn}
+                              style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.12)' }}
+                            />
+                          </Tooltip>
+                          <Tooltip title="Zoom out">
+                            <Button
+                              size="small"
+                              icon={<MinusOutlined />}
+                              onClick={zoomExpressionTreeOut}
+                              style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.12)' }}
+                            />
+                          </Tooltip>
+                          <Tooltip title="Reset view">
+                            <Button
+                              size="small"
+                              icon={<HomeOutlined />}
+                              onClick={resetExpressionTreeView}
+                              style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.12)' }}
+                            />
+                          </Tooltip>
+                          <div style={{ borderTop: '1px solid #e8e8e8', margin: '2px 0', width: '100%' }} />
+                        </>
+                      )}
+                      <Tooltip title={expressionTreePoppedOut ? 'Pop in' : 'Pop out'}>
                         <Button
                           size="small"
-                          icon={<PlusOutlined />}
-                          onClick={zoomExpressionTreeIn}
-                          style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.12)' }}
-                        />
-                      </Tooltip>
-                      <Tooltip title="Zoom out">
-                        <Button
-                          size="small"
-                          icon={<MinusOutlined />}
-                          onClick={zoomExpressionTreeOut}
-                          style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.12)' }}
-                        />
-                      </Tooltip>
-                      <Tooltip title="Reset view">
-                        <Button
-                          size="small"
-                          icon={<HomeOutlined />}
-                          onClick={resetExpressionTreeView}
+                          icon={expressionTreePoppedOut ? <CompressOutlined /> : <FullscreenOutlined />}
+                          onClick={toggleExpressionTreePopout}
                           style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.12)' }}
                         />
                       </Tooltip>
                     </div>
+
+                    {expressionTreePoppedOut && (
+                      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8c8c8c', fontSize: 12, flexDirection: 'column', gap: 8 }}>
+                        <FullscreenOutlined style={{ fontSize: 24, opacity: 0.4 }} />
+                        <span>Expression tree is popped out</span>
+                      </div>
+                    )}
                   </ReactFlowProvider>
                 ) : (
                   <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8c8c8c', fontSize: 12 }}>
@@ -2198,6 +2286,129 @@ const NodePredicateModal = ({
         </Drawer>
 
       </Drawer>
+
+      {/* Popout portal for expression tree */}
+      {expressionTreePoppedOut && expressionTreeGraph.elements.length > 0 && ReactDOM.createPortal(
+        <div
+          ref={popoutRef}
+          className="nodrag"
+          style={{
+            position: 'fixed',
+            left: popoutPosition.x,
+            top: popoutPosition.y,
+            width: popoutDimensions.width,
+            height: popoutDimensions.height,
+            zIndex: 10000,
+            background: '#ffffff',
+            borderRadius: 8,
+            boxShadow: '0 6px 30px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Draggable header */}
+          <div
+            onMouseDown={handlePopoutDragMouseDown}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 12px',
+              background: '#fafafa',
+              borderBottom: '1px solid #e8e8e8',
+              cursor: 'grab',
+              userSelect: 'none',
+              flexShrink: 0
+            }}
+          >
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#595959', textTransform: 'uppercase' }}>
+              Expression Tree
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Tooltip title="Zoom in">
+                <Button
+                  size="small"
+                  icon={<PlusOutlined />}
+                  onClick={zoomExpressionTreeIn}
+                  style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.12)' }}
+                />
+              </Tooltip>
+              <Tooltip title="Zoom out">
+                <Button
+                  size="small"
+                  icon={<MinusOutlined />}
+                  onClick={zoomExpressionTreeOut}
+                  style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.12)' }}
+                />
+              </Tooltip>
+              <Tooltip title="Reset view">
+                <Button
+                  size="small"
+                  icon={<HomeOutlined />}
+                  onClick={resetExpressionTreeView}
+                  style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.12)' }}
+                />
+              </Tooltip>
+              <div style={{ borderLeft: '1px solid #d9d9d9', height: 20, margin: '0 2px' }} />
+              <Tooltip title="Pop in">
+                <Button
+                  size="small"
+                  icon={<CompressOutlined />}
+                  onClick={toggleExpressionTreePopout}
+                  style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.12)' }}
+                />
+              </Tooltip>
+            </div>
+          </div>
+
+          {/* Expression tree content */}
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+            <ReactFlowProvider>
+              <ReactFlow
+                elements={expressionTreeElements}
+                nodeTypes={expressionTreeGraph.nodeTypes}
+                nodesDraggable={false}
+                nodesConnectable={false}
+                elementsSelectable={false}
+                zoomOnScroll
+                panOnScroll={false}
+                zoomOnDoubleClick={false}
+                minZoom={0.45}
+                maxZoom={1.6}
+                onLoad={(instance) => {
+                  setExpressionTreeInstance(instance);
+                  instance.fitView({ padding: 0.25 });
+                }}
+                style={{ background: 'transparent' }}
+              >
+                <Background gap={18} size={1} color="#f0f0f0" />
+              </ReactFlow>
+            </ReactFlowProvider>
+          </div>
+
+          {/* Resize handle */}
+          <div
+            onMouseDown={handlePopoutResizeMouseDown}
+            style={{
+              position: 'absolute',
+              right: 0,
+              bottom: 0,
+              width: 16,
+              height: 16,
+              cursor: 'nw-resize',
+              zIndex: 10
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" style={{ position: 'absolute', right: 0, bottom: 0 }}>
+              <line x1="16" y1="4" x2="4" y2="16" stroke="#bbb" strokeWidth="2" />
+              <line x1="16" y1="8" x2="8" y2="16" stroke="#bbb" strokeWidth="2" />
+            </svg>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
 
